@@ -67,7 +67,8 @@ static DWORD WINAPI Init(LPVOID) {
 BOOL APIENTRY DllMain(HMODULE h, DWORD reason, LPVOID) {
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(h);
-        CreateThread(nullptr, 0, Init, nullptr, 0, nullptr);
+        HANDLE t = CreateThread(nullptr, 0, Init, nullptr, 0, nullptr);
+        if (t) CloseHandle(t);   // thread keeps running; we just do not need the handle
     }
     return TRUE;
 }

@@ -12,24 +12,24 @@
 //   Opening   wait for its screen slot to become non-null (bounded)
 //   Showing   hold while the player reads it; the screen closes ITSELF when
 //             the confirm button is pressed, which nulls the slot again
-//   done      hand off to step 0x2E (cleanup / back to Naomi's Palace)
+//   done      queue step 0x2E (cleanup / back to Naomi's Palace)
 //
-// The screen manager keeps live screens in an array indexed by SCREEN ID:
+// Live screens are kept in an array indexed by SCREEN ID:
 //     slot(id) = mainMgr + 0x1E8 + id*8
 // The engine's step 0x2D polls mainMgr+0x8F0, which is simply slot(225).
-// An earlier version of this file hardcoded 0x8F0 while opening screen 220,
-// so it polled a permanently-null slot and tore the stage down on the next
-// frame. The slot is now computed from whichever screen id we opened.
 //
 // We deliberately never hand off to step 0x2D: the engine's sub_B60910 waits
 // on that slot with no timeout, so routing through it could hang in a new
-// place. Every wait here is ours and the open wait is bounded.
+// place. Every wait here is ours, and both are bounded.
 
 #include "game.h"
 #include "config.h"
 #include "records.h"
 #include "offsets.h"
 #include "log.h"
+
+#include <windows.h>
+#include <stdio.h>
 
 namespace {
 
@@ -40,13 +40,25 @@ constexpr int kModeBattleKing = 8103;
 // OpenScreen, so this only ever catches genuine failure.
 constexpr int kOpenTimeout = 120;
 
+// CActionColosseumExtra is allocated with size 0x218 (the allocation site does
+// `mov ecx, 0x218`), so any field window must stop there.
+constexpr uintptr_t kActionSize = 0x218;
+
+// Entry detection: the handler is called every frame while step 0x2C is
+// current, so a gap between calls means we have re-entered the step. Keying
+// off the `self` pointer instead would resume stale state whenever the macro
+// left the step without us running Finish() (e.g. quit to title mid-recap).
+constexpr uint64_t kFreshGapMs = 500;
+
 enum class Stage { Fresh, Opening, Showing };
 
-void*  s_self   = nullptr;
-Stage  s_stage  = Stage::Fresh;
-int    s_frames = 0;
+Stage    s_stage    = Stage::Fresh;
+int      s_frames   = 0;
+uint64_t s_lastTick = 0;
 
 uint64_t ScreenSlot(void* mgr, int screenId) {
+    // screenId is range-checked in config::Load(), so this stays inside the
+    // slot array; the assert documents the invariant for future edits.
     const uintptr_t off = off::C_SCREEN_SLOT_BASE + (uintptr_t)screenId * 8;
     return *(uint64_t*)((unsigned char*)mgr + off);
 }
@@ -54,28 +66,35 @@ uint64_t ScreenSlot(void* mgr, int screenId) {
 void Finish(void* self, const char* why) {
     game::SetNextStep(self, (int)off::C_STEP_2E);
     hoe::Log("step 0x2C: %s -> step 0x2E (exit)", why);
-    s_self = nullptr;
     s_stage = Stage::Fresh;
     s_frames = 0;
+    s_lastTick = 0;
 }
 
-// Diagnostic: the kill-count field was inferred from the only `inc` in the
-// kill-counter module but read back garbage at step 0x2C time. Log the pointer
-// chain and a window of candidate dwords so the real field can be identified
-// against a known on-screen score.
+// Optional field dump used to hunt the real kill-count offset. Off by default:
+// it walks a window of a live engine object and is only meaningful while
+// someone is comparing it against a known on-screen score.
 void DumpCandidates() {
     void* mgr = *game::pMainMgr;
-    hoe::Log("  diag: mainMgr=%p", mgr);
-    if (!mgr) return;
+    if (!mgr) { hoe::Log("  diag: no mainMgr"); return; }
     auto action = *(unsigned char**)((unsigned char*)mgr + off::C_ACTION_OFFSET);
-    hoe::Log("  diag: [mainMgr+0xBA0] = %p", action);
-    if (!action) return;
-    hoe::Log("  diag: vftable=%p", *(void**)action);
-    for (uintptr_t o = 0x180; o < 0x220; o += 16) {
-        hoe::Log("  diag: +0x%03llX  %10d %10d %10d %10d",
+    if (!action) { hoe::Log("  diag: no action object"); return; }
+
+    // mainMgr+0xBA0 is a polymorphic "current action" slot written from several
+    // sites, so confirm the concrete type before reading fields off it.
+    const void* vft = *(void**)action;
+    const bool isExtra = game::IsColosseumExtra(vft);
+    hoe::Log("  diag: action=%p vftable=%p (%s)", action, vft,
+             isExtra ? "CActionColosseumExtra" : "NOT CActionColosseumExtra");
+    if (!isExtra) return;
+
+    char line[256];
+    for (uintptr_t o = 0x180; o + 16 <= kActionSize; o += 16) {
+        snprintf(line, sizeof(line), "  diag: +0x%03llX  %11d %11d %11d %11d",
                  (unsigned long long)o,
                  *(int*)(action + o), *(int*)(action + o + 4),
                  *(int*)(action + o + 8), *(int*)(action + o + 12));
+        hoe::Log("%s", line);
     }
 }
 
@@ -84,27 +103,32 @@ void DumpCandidates() {
 extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
     const auto& cfg = config::Get();
 
-    if (self != s_self) {                    // first frame in this step
-        s_self = self;
-        s_stage = Stage::Fresh;
+    const uint64_t now = GetTickCount64();
+    if (s_lastTick == 0 || now - s_lastTick > kFreshGapMs) {
+        s_stage = Stage::Fresh;                 // re-entered the step
         s_frames = 0;
     }
+    s_lastTick = now;
 
     void* mgr = *game::pMainMgr;
     if (!mgr) { Finish(self, "no main manager"); return; }
-    const uint64_t slot = ScreenSlot(mgr, cfg.ResultScreenId);
 
     switch (s_stage) {
 
     case Stage::Fresh: {
-        DumpCandidates();
+        if (cfg.DiagDumpFields) DumpCandidates();
+
+        // NOTE: the kill-count field is NOT yet identified. 0x1A4 was wrong,
+        // and 0x1B4 collided with a 0..7 state selector. ReadKillCount() is
+        // type-checked and returns -1 when it cannot be trusted; recording is
+        // off by default until the field is proven against a known score.
         const int kills = game::ReadKillCount();
-        if (cfg.TrackBestScore && kills >= 0 && kills < 100000) {
+        if (cfg.TrackBestScore && kills > 0) {
             const int prev = records::GetBest(kModeBattleKing);
             const bool best = records::SetBest(kModeBattleKing, kills);
-            hoe::Log("step 0x2C: kills=%d previous best=%d%s", kills, prev, best ? " (NEW BEST)" : "");
+            hoe::Log("step 0x2C: score=%d previous best=%d%s", kills, prev, best ? " (NEW BEST)" : "");
         } else {
-            hoe::Log("step 0x2C: kills=%d (implausible, not recorded)", kills);
+            hoe::Log("step 0x2C: score field unresolved (read %d), not recorded", kills);
         }
 
         if (!cfg.ShowResultScreen) { Finish(self, "results disabled"); return; }
@@ -115,12 +139,17 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
 
         void* arg3 = *(void**)((unsigned char*)mgr + off::C_OPENSCREEN_ARG3_FIELD);
         void* scr  = game::OpenScreen(mgr, cfg.ResultScreenId, arg3);
-        game::PostOpenNotify(mission, 0x1D, 0, 1, 1);
+
+        // The reference handler does `lea edx,[r9+0x1D]` with r9d==1, so the
+        // argument is 0x1E - not the 0x1D a naive read of the immediate gives.
+        game::PostOpenNotify(mission, 0x1E, 0, 1, 1);
 
         hoe::Log("step 0x2C: OpenScreen(%d) -> %p (slot mainMgr+0x%llX), parent=%p",
                  cfg.ResultScreenId, scr,
                  (unsigned long long)(off::C_SCREEN_SLOT_BASE + (uintptr_t)cfg.ResultScreenId * 8),
                  arg3);
+
+        if (!scr) { Finish(self, "OpenScreen returned null"); return; }
 
         s_stage = Stage::Opening;
         s_frames = 0;
@@ -129,9 +158,8 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
 
     case Stage::Opening: {
         ++s_frames;
-        if (slot != 0) {
-            hoe::Log("step 0x2C: screen registered after %d frames (slot=0x%llX) - press A/B to close",
-                     s_frames, (unsigned long long)slot);
+        if (ScreenSlot(mgr, cfg.ResultScreenId) != 0) {
+            hoe::Log("step 0x2C: screen registered after %d frames - press A/B to close", s_frames);
             s_stage = Stage::Showing;
             s_frames = 0;
             return;
@@ -144,15 +172,20 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
 
     case Stage::Showing: {
         ++s_frames;
-        if (slot == 0) {                     // screen closed itself on confirm
+        if (ScreenSlot(mgr, cfg.ResultScreenId) == 0) {   // closed itself on confirm
             Finish(self, "player dismissed the results screen");
             return;
         }
         if (s_frames % 600 == 0) {
             hoe::Log("step 0x2C: results on screen, frame %d", s_frames);
         }
-        // 0 = wait indefinitely, matching the original game.
-        if (cfg.ResultTimeoutSec > 0 && s_frames >= cfg.ResultTimeoutSec * 60) {
+        // 0 disables the timeout. Timing out while the screen is still
+        // registered leaves it on top of gameplay, which is bad - but far less
+        // bad than the unbounded freeze this mod exists to remove.
+        if (cfg.ResultTimeoutSec > 0 &&
+            (int64_t)s_frames >= (int64_t)cfg.ResultTimeoutSec * 60) {
+            hoe::Log("step 0x2C: WARNING - screen still registered at timeout; "
+                     "it may linger on screen. Set ResultTimeoutSec=0 if it is dismissible.");
             Finish(self, "results screen not dismissed within the configured timeout");
         }
         return;

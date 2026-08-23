@@ -30,10 +30,19 @@ bool Bind() {
     return true;
 }
 
+bool IsColosseumExtra(const void* vft) {
+    const auto& r = resolve::Get();
+    if (!r.ok || !r.ActionExtraVft || !vft) return false;
+    return (uintptr_t)vft == hoe::Base() + r.ActionExtraVft;
+}
+
+// mainMgr+0xBA0 is a polymorphic "current action" slot written from several
+// sites, so the concrete type must be confirmed before reading fields off it.
 int ReadKillCount() {
     if (!pMainMgr || !*pMainMgr) return -1;
     auto action = *(unsigned char**)((unsigned char*)*pMainMgr + off::C_ACTION_OFFSET);
     if (!action) return -1;
+    if (!IsColosseumExtra(*(void**)action)) return -1;
     return *(int*)(action + off::C_KILL_COUNT_OFFSET);
 }
 

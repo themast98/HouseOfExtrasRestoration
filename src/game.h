@@ -19,6 +19,7 @@ extern void**            pFlagMgr;
 extern float*            pKFloat;
 
 bool Bind();          // fills the above from resolve::Get(); false if unresolved
-int  ReadKillCount(); // CActionColosseumExtra + 0x1A4, or -1 if unavailable
+bool IsColosseumExtra(const void* vft);   // is this pointer's vtable CActionColosseumExtra?
+int  ReadKillCount();                     // -1 when the field cannot be trusted
 
 }  // namespace game

@@ -151,6 +151,9 @@ Resolved Build() {
     hoe::Log("resolving addresses (RTTI + anchor, no hardcoded RVAs)...");
 
     // --- RTTI walk: the two patch sites and the two reference handlers ---
+    r.ActionExtraVft = FindVTable(off::TYPENAME_ACTION_COLOSSEUM_EXTRA);
+    hoe::Log("  CActionColosseumExtra vft +0x%llX", (unsigned long long)r.ActionExtraVft);
+
     uintptr_t vtExtra = FindVTable(off::TYPENAME_COLOSSEUM_EXTRA);
     uintptr_t vtColos = FindVTable(off::TYPENAME_COLOSSEUM);
     if (!vtExtra || !vtColos) { hoe::Log("RTTI walk failed"); return r; }

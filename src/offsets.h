@@ -46,13 +46,14 @@ constexpr char TYPENAME_COLOSSEUM[] = ".?AVCMissionMacroColosseum@@";
 constexpr int SLOT_REF_STEP_2C = 62;
 constexpr int SLOT_STEP_2D_WORKING = 63;
 constexpr uintptr_t EXPECT_STEP_2D_WORKING = 0xB60910;
+constexpr char TYPENAME_ACTION_COLOSSEUM_EXTRA[] = ".?AVCActionColosseumExtra@@";
 
 // ---- struct field offsets and mode constants ----
 constexpr uintptr_t C_SCREEN_RESULT = 225;
 constexpr uintptr_t C_STEP_2D = 45;
 constexpr uintptr_t C_STEP_2E = 46;
 constexpr uintptr_t C_ACTION_OFFSET = 0xBA0;
-constexpr uintptr_t C_KILL_COUNT_OFFSET = 0x1A4;
+constexpr uintptr_t C_KILL_COUNT_OFFSET = 0x1B4;
 constexpr uintptr_t C_CUR_STEP_FIELD = 0x128;
 constexpr uintptr_t C_NEXT_STEP_FIELD = 0x12C;
 constexpr uintptr_t C_MISSION_FIELD = 0x8;

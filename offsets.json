@@ -77,6 +77,10 @@
           "expect_rva": "0xB60910"
         }
       }
+    },
+    "ACTION_COLOSSEUM_EXTRA": {
+      "type_name": ".?AVCActionColosseumExtra@@",
+      "slots": {}
     }
   },
   "constants": {
@@ -84,7 +88,7 @@
     "STEP_2D": 45,
     "STEP_2E": 46,
     "ACTION_OFFSET": "0xBA0",
-    "KILL_COUNT_OFFSET": "0x1A4",
+    "KILL_COUNT_OFFSET": "0x1B4",
     "CUR_STEP_FIELD": "0x128",
     "NEXT_STEP_FIELD": "0x12C",
     "MISSION_FIELD": "0x8",

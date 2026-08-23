@@ -25,6 +25,9 @@ struct Resolved {
     uintptr_t GFlagMgr        = 0;
     uintptr_t GMainMgr        = 0;
     uintptr_t KFloat          = 0;
+
+    // RTTI: CActionColosseumExtra vtable, used to type-check [mainMgr+0xBA0]
+    uintptr_t ActionExtraVft  = 0;
 };
 
 // Resolves once and caches. Logs every address next to its expected value so a
