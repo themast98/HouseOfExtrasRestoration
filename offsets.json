@@ -1,0 +1,55 @@
+{
+  "build": {
+    "exe": "Yakuza4.exe",
+    "size": 28396336,
+    "note": "Yakuza 4 Remastered, Steam, 2024-07-21. expect_rva values are a cross-check only; the mod resolves everything at runtime."
+  },
+
+  "anchor": {
+    "name": "REF_STEP_2C",
+    "comment": "CMissionMacroColosseum step 0x2C handler. Calls every engine helper we need, so one unique pattern resolves all of them via ReadCall.",
+    "pattern": "40 53 48 83 EC 30 C5 FA 10 15 3E",
+    "expect_rva": "0xB5C320",
+    "calls": {
+      "TRANSITION_SETUP": { "at": "0x24", "expect_rva": "0xB4ADC0" },
+      "COMMIT_FLAGS":     { "at": "0x30", "expect_rva": "0xBF6AB0" },
+      "OPEN_SCREEN":      { "at": "0x48", "expect_rva": "0x3272D0" },
+      "SET_NEXT_STEP":    { "at": "0x55", "expect_rva": "0xB52B20" },
+      "POST_OPEN_NOTIFY": { "at": "0x73", "expect_rva": "0xB4A600" }
+    },
+    "riprefs": {
+      "G_FLAG_MGR": { "at": "0x29", "len": 7, "expect_rva": "0x1A1FA20" },
+      "G_MAIN_MGR": { "at": "0x35", "len": 7, "expect_rva": "0x197C838" },
+      "K_FLOAT":    { "at": "0x06", "len": 8, "expect_rva": "0x122D46C" }
+    }
+  },
+
+  "rtti": {
+    "COLOSSEUM_EXTRA": {
+      "type_name": ".?AVCMissionMacroColosseumExtra@@",
+      "slots": {
+        "STEP_2C_STUB": { "slot": 62, "expect_rva": "0xB5C3C0", "space": 16 },
+        "STEP_2D_STUB": { "slot": 63, "expect_rva": "0xB60940", "space": 16 }
+      }
+    },
+    "COLOSSEUM": {
+      "type_name": ".?AVCMissionMacroColosseum@@",
+      "slots": {
+        "REF_STEP_2C":     { "slot": 62, "expect_rva": "0xB5C320" },
+        "STEP_2D_WORKING": { "slot": 63, "expect_rva": "0xB60910" }
+      }
+    }
+  },
+
+  "constants": {
+    "SCREEN_RESULT": 220,
+    "STEP_2D": 45,
+    "STEP_2E": 46,
+    "ACTION_OFFSET": "0xBA0",
+    "KILL_COUNT_OFFSET": "0x1A4",
+    "CUR_STEP_FIELD": "0x128",
+    "NEXT_STEP_FIELD": "0x12C",
+    "MISSION_FIELD": "0x8",
+    "OPENSCREEN_ARG3_FIELD": "0x1F0"
+  }
+}

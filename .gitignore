@@ -1,0 +1,5 @@
+build/
+refs/*.bin
+*.asi
+*.log
+*.records
