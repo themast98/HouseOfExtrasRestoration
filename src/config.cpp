@@ -55,8 +55,9 @@ Settings Load() {
     s.ShowResultScreen = GetPrivateProfileIntA("Results", "ShowResultScreen", s.ShowResultScreen, p);
     s.ResultScreenId   = GetPrivateProfileIntA("Results", "ResultScreenId",   s.ResultScreenId,   p);
     s.TrackBestScore   = GetPrivateProfileIntA("Results", "TrackBestScore",   s.TrackBestScore,   p);
-    hoe::Log("config: Enabled=%d ShowResultScreen=%d ResultScreenId=%d TrackBestScore=%d",
-             s.Enabled, s.ShowResultScreen, s.ResultScreenId, s.TrackBestScore);
+    s.ResultTimeoutSec = GetPrivateProfileIntA("Results", "ResultTimeoutSec", s.ResultTimeoutSec, p);
+    hoe::Log("config: Enabled=%d ShowResultScreen=%d ResultScreenId=%d TrackBestScore=%d ResultTimeoutSec=%d",
+             s.Enabled, s.ShowResultScreen, s.ResultScreenId, s.TrackBestScore, s.ResultTimeoutSec);
     return s;
 }
 

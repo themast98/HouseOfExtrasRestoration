@@ -48,7 +48,7 @@ constexpr int SLOT_STEP_2D_WORKING = 63;
 constexpr uintptr_t EXPECT_STEP_2D_WORKING = 0xB60910;
 
 // ---- struct field offsets and mode constants ----
-constexpr uintptr_t C_SCREEN_RESULT = 220;
+constexpr uintptr_t C_SCREEN_RESULT = 225;
 constexpr uintptr_t C_STEP_2D = 45;
 constexpr uintptr_t C_STEP_2E = 46;
 constexpr uintptr_t C_ACTION_OFFSET = 0xBA0;
@@ -57,5 +57,6 @@ constexpr uintptr_t C_CUR_STEP_FIELD = 0x128;
 constexpr uintptr_t C_NEXT_STEP_FIELD = 0x12C;
 constexpr uintptr_t C_MISSION_FIELD = 0x8;
 constexpr uintptr_t C_OPENSCREEN_ARG3_FIELD = 0x1F0;
+constexpr uintptr_t C_SCREEN_SLOT_BASE = 0x1E8;
 
 }  // namespace off
