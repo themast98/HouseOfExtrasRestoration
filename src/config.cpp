@@ -45,12 +45,20 @@ void WriteDefaults(const char* p) {
         ";  1 = show the results screen\n"
         "ShowResultScreen=1\n"
         "\n;  Screen id opened for the results screen. Valid range 0-310.\n"
-        ";  225 = pjs_dlc_result (default) - the real recap. Loads tougijyo_all.bin,\n"
-        ";        allocates a pad listener, and closes itself on the confirm button.\n"
-        ";  220 = pjs_dlc_survivalbtl_end - DO NOT USE. It constructs and registers,\n"
-        ";        but its mode field is left at 4 (outside its own 0..3 switch), so its\n"
-        ";        draw and update both early-out: it never renders and never closes.\n"
-        "ResultScreenId=225\n"
+        ";  220 = pjs_dlc_survivalbtl_end (default) - the House of Extras results\n"
+        ";        layout. Its constructor leaves the draw gate closed; the mod calls\n"
+        ";        the engine's own setter to open it and play the 'in' animation.\n"
+        ";  225 = pjs_dlc_result - the Coliseum tournament result. It also wants\n"
+        ";        tougijyo_all.bin, and was observed registering but never finishing\n"
+        ";        its load, so it stayed blank.\n"
+        "ResultScreenId=220\n"
+        "\n;  Which page of the results layout to show, 0-3. The layout has four\n"
+        ";  pages built from these textures: svbtl_clear, svbtl_congra, svbtl_mission,\n"
+        ";  svbtl_boss / oni_timeover. If the wrong banner appears, try another value.\n"
+        "ResultVariant=0\n"
+        "\n;  Frames the screen holds before it plays its close animation.\n"
+        ";  Retail call sites use 30, 40 and 180.\n"
+        "ResultHoldFrames=180\n"
         "\n;  Seconds to wait for you to dismiss the results screen (0-3600).\n"
         ";  120 is far longer than anyone needs to read a recap, and guarantees the\n"
         ";  game can never sit forever on a screen that will not close.\n"
@@ -85,6 +93,8 @@ Settings Load() {
     s.Enabled          = GetPrivateProfileIntA("General", "Enabled",          s.Enabled,          p);
     s.ShowResultScreen = GetPrivateProfileIntA("Results", "ShowResultScreen", s.ShowResultScreen, p);
     s.ResultScreenId   = GetPrivateProfileIntA("Results", "ResultScreenId",   s.ResultScreenId,   p);
+    s.ResultVariant    = GetPrivateProfileIntA("Results", "ResultVariant",    s.ResultVariant,    p);
+    s.ResultHoldFrames = GetPrivateProfileIntA("Results", "ResultHoldFrames", s.ResultHoldFrames, p);
     s.ResultTimeoutSec = GetPrivateProfileIntA("Results", "ResultTimeoutSec", s.ResultTimeoutSec, p);
     s.TrackBestScore   = GetPrivateProfileIntA("Results", "TrackBestScore",   s.TrackBestScore,   p);
     s.DiagDumpFields   = GetPrivateProfileIntA("Results", "DiagDumpFields",   s.DiagDumpFields,   p);
@@ -97,6 +107,16 @@ Settings Load() {
     if (s.ResultScreenId < 0 || s.ResultScreenId > 310) {
         hoe::Log("config: ResultScreenId=%d out of range 0-310, using 225", s.ResultScreenId);
         s.ResultScreenId = 225;
+    }
+    // sub_3A46D0 silently does nothing (leaves the draw gate shut) unless the
+    // variant is 0..3, which is exactly why the ctor's 4 sentinel renders nothing.
+    if (s.ResultVariant < 0 || s.ResultVariant > 3) {
+        hoe::Log("config: ResultVariant=%d out of range 0-3, using 0", s.ResultVariant);
+        s.ResultVariant = 0;
+    }
+    if (s.ResultHoldFrames < 1 || s.ResultHoldFrames > 3600) {
+        hoe::Log("config: ResultHoldFrames=%d out of range, using 180", s.ResultHoldFrames);
+        s.ResultHoldFrames = 180;
     }
     // Guards against ResultTimeoutSec * 60 overflowing.
     if (s.ResultTimeoutSec < 0 || s.ResultTimeoutSec > 3600) {

@@ -216,6 +216,13 @@ Resolved Build() {
         return r;
     }
 
+    r.SetResultVariant = FindPattern(off::PATTERN_SET_RESULT_VARIANT);
+    Check("SetResultVariant", r.SetResultVariant, off::EXPECT_SET_RESULT_VARIANT);
+    if (!r.SetResultVariant) {
+        hoe::Log("result-variant setter not found - the screen would render nothing");
+        return r;
+    }
+
     r.ok = true;
     hoe::Log("resolve OK");
     return r;

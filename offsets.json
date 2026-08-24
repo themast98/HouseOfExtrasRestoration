@@ -84,7 +84,7 @@
     }
   },
   "constants": {
-    "SCREEN_RESULT": 225,
+    "SCREEN_RESULT": 220,
     "STEP_2D": 45,
     "STEP_2E": 46,
     "ACTION_OFFSET": "0xBA0",
@@ -93,6 +93,16 @@
     "NEXT_STEP_FIELD": "0x12C",
     "MISSION_FIELD": "0x8",
     "OPENSCREEN_ARG3_FIELD": "0x1F0",
-    "SCREEN_SLOT_BASE": "0x1E8"
+    "SCREEN_SLOT_BASE": "0x1E8",
+    "SCREEN_LOADED_FIELD": "0x1A8",
+    "SCREEN_VARIANT_FIELD": "0x1B8",
+    "SCREEN_DRAWGATE_FIELD": "0x1C0"
+  },
+  "patterns": {
+    "SET_RESULT_VARIANT": {
+      "comment": "sub_3A46D0(screen, variant, holdFrames) - writes +0x1B8/+0x1BC, sets the draw gate +0x1C0=1, and plays the layout's type-0 'in' animation (which sets elem[0x2C] bit 0, the thing that actually makes it render). Relocation-free prefix.",
+      "pattern": "48 83 EC 28 89 91 B8 01 00 00 44 89 81 BC 01 00 00",
+      "expect_rva": "0x3A46D0"
+    }
   }
 }

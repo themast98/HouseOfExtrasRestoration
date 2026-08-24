@@ -34,6 +34,10 @@ constexpr uintptr_t RIPAT_K_FLOAT = 0x06;
 constexpr uintptr_t RIPLEN_K_FLOAT = 8;
 constexpr uintptr_t EXPECT_K_FLOAT = 0x122D46C;
 
+// ---- standalone byte patterns ----
+constexpr char PATTERN_SET_RESULT_VARIANT[] = "48 83 EC 28 89 91 B8 01 00 00 44 89 81 BC 01 00 00";
+constexpr uintptr_t EXPECT_SET_RESULT_VARIANT = 0x3A46D0;
+
 // ---- RTTI: type descriptor -> COL -> vftable -> slot ----
 constexpr char TYPENAME_COLOSSEUM_EXTRA[] = ".?AVCMissionMacroColosseumExtra@@";
 constexpr int SLOT_STEP_2C_STUB = 62;
@@ -49,7 +53,7 @@ constexpr uintptr_t EXPECT_STEP_2D_WORKING = 0xB60910;
 constexpr char TYPENAME_ACTION_COLOSSEUM_EXTRA[] = ".?AVCActionColosseumExtra@@";
 
 // ---- struct field offsets and mode constants ----
-constexpr uintptr_t C_SCREEN_RESULT = 225;
+constexpr uintptr_t C_SCREEN_RESULT = 220;
 constexpr uintptr_t C_STEP_2D = 45;
 constexpr uintptr_t C_STEP_2E = 46;
 constexpr uintptr_t C_ACTION_OFFSET = 0xBA0;
@@ -59,5 +63,8 @@ constexpr uintptr_t C_NEXT_STEP_FIELD = 0x12C;
 constexpr uintptr_t C_MISSION_FIELD = 0x8;
 constexpr uintptr_t C_OPENSCREEN_ARG3_FIELD = 0x1F0;
 constexpr uintptr_t C_SCREEN_SLOT_BASE = 0x1E8;
+constexpr uintptr_t C_SCREEN_LOADED_FIELD = 0x1A8;
+constexpr uintptr_t C_SCREEN_VARIANT_FIELD = 0x1B8;
+constexpr uintptr_t C_SCREEN_DRAWGATE_FIELD = 0x1C0;
 
 }  // namespace off

@@ -28,6 +28,11 @@ struct Resolved {
 
     // RTTI: CActionColosseumExtra vtable, used to type-check [mainMgr+0xBA0]
     uintptr_t ActionExtraVft  = 0;
+
+    // pattern: sub_3A46D0(screen, variant, holdFrames) - the result-variant
+    // setter the deleted src/ranking code called. Without it screen 220
+    // constructs but its draw gate at +0x1C0 stays 0 and it renders nothing.
+    uintptr_t SetResultVariant = 0;
 };
 
 // Resolves once and caches. Logs every address next to its expected value so a

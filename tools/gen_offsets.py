@@ -54,6 +54,12 @@ for name, r in a["riprefs"].items():
     L += expect(name, r["expect_rva"])
 L.append("")
 
+L.append("// ---- standalone byte patterns ----")
+for name, p in meta.get("patterns", {}).items():
+    L.append(f'constexpr char PATTERN_{name}[] = "{p["pattern"]}";')
+    L += expect(name, p["expect_rva"])
+L.append("")
+
 L.append("// ---- RTTI: type descriptor -> COL -> vftable -> slot ----")
 for cls, info in meta["rtti"].items():
     L.append(f'constexpr char TYPENAME_{cls}[] = "{info["type_name"]}";')

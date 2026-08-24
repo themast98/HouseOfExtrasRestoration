@@ -11,6 +11,7 @@ CommitFlagsFn     CommitFlags     = nullptr;
 OpenScreenFn      OpenScreen      = nullptr;
 SetNextStepFn     SetNextStep     = nullptr;
 PostOpenNotifyFn  PostOpenNotify  = nullptr;
+SetResultVariantFn SetResultVariant = nullptr;
 void**            pMainMgr        = nullptr;
 void**            pFlagMgr        = nullptr;
 float*            pKFloat         = nullptr;
@@ -24,6 +25,7 @@ bool Bind() {
     OpenScreen      = (OpenScreenFn)     (b + r.OpenScreen);
     SetNextStep     = (SetNextStepFn)    (b + r.SetNextStep);
     PostOpenNotify  = (PostOpenNotifyFn) (b + r.PostOpenNotify);
+    SetResultVariant = (SetResultVariantFn)(b + r.SetResultVariant);
     pMainMgr        = (void**)(b + r.GMainMgr);
     pFlagMgr        = (void**)(b + r.GFlagMgr);
     pKFloat         = (float*)(b + r.KFloat);

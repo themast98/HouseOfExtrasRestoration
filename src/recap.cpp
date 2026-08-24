@@ -1,26 +1,38 @@
 // Replacement for CMissionMacroColosseumExtra's deleted step 0x2C handler.
 //
-// Sega gutted this to `ret 0` when they removed src/ranking, so the macro
-// parked at step 0x2C with no next step queued -> infinite black screen.
+// Sega gutted this to `ret 0` when they removed src/ranking, so the macro parked
+// at step 0x2C with no next step queued -> infinite black screen.
 //
 // A step handler is invoked EVERY FRAME while it is the current step - that is
 // precisely why the `ret 0` stub span forever. We use that to run the whole
-// recap lifecycle here, mirroring the original console behaviour where the
-// player dismisses the results screen with Cross/Circle (Xbox A/B):
+// recap lifecycle here:
 //
-//   Fresh     open the result screen
-//   Opening   wait for its screen slot to become non-null (bounded)
-//   Showing   hold while the player reads it; the screen closes ITSELF when
-//             the confirm button is pressed, which nulls the slot again
+//   Fresh     open the results screen (220 = pjs_dlc_survivalbtl_end)
+//   Opening   wait for its screen slot to become non-null      (bounded)
+//   Loading   wait for the layout to finish loading, then call the engine's own
+//             result-variant setter                            (bounded)
+//   Showing   hold while the player reads it, until the screen closes itself
 //   done      queue step 0x2E (cleanup / back to Naomi's Palace)
+//
+// WHY THE SETTER MATTERS. Screen 220's constructor leaves [obj+0x1C0] = 0, and
+// its Draw returns immediately while that is zero. The engine's own setter
+// sub_3A46D0(screen, variant, holdFrames) writes the variant to +0x1B8, the hold
+// to +0x1BC, opens the draw gate at +0x1C0, AND plays the layout page's type-0
+// "in" animation. That animation is what sets bit 0 of the element's flags word,
+// and the element updater returns unless that bit is set - so writing the fields
+// by hand would still render nothing. It also does nothing at all unless the
+// variant is 0..3, which is why the constructor's 4 sentinel stays blank.
+//
+// ORDERING: the setter dereferences the layout page array unconditionally, so
+// calling it before the layout has loaded ([obj+0x1A8] != 0) is a null deref.
+// Hence the separate Loading stage.
 //
 // Live screens are kept in an array indexed by SCREEN ID:
 //     slot(id) = mainMgr + 0x1E8 + id*8
-// The engine's step 0x2D polls mainMgr+0x8F0, which is simply slot(225).
 //
-// We deliberately never hand off to step 0x2D: the engine's sub_B60910 waits
-// on that slot with no timeout, so routing through it could hang in a new
-// place. Every wait here is ours, and both are bounded.
+// We deliberately never hand off to step 0x2D: the engine's sub_B60910 waits on
+// slot(225) with no timeout, so routing through it could hang in a new place.
+// Every wait here is ours and every one of them is bounded.
 
 #include "game.h"
 #include "config.h"
@@ -36,62 +48,54 @@ namespace {
 // Matches enemy_dispose/ene_st_tougi_8103.bin, the set Battle King uses.
 constexpr int kModeBattleKing = 8103;
 
-// ~2s at 60fps for the screen to register. It is written synchronously inside
-// OpenScreen, so this only ever catches genuine failure.
+// ~2s at 60fps. The slot is written synchronously inside OpenScreen, so this
+// only ever catches genuine failure.
 constexpr int kOpenTimeout = 120;
 
-// CActionColosseumExtra is allocated with size 0x218 (the allocation site does
-// `mov ecx, 0x218`), so any field window must stop there.
+// ~5s at 60fps for the layout to stream in.
+constexpr int kLoadTimeout = 300;
+
+// CActionColosseumExtra is allocated with size 0x218.
 constexpr uintptr_t kActionSize = 0x218;
 
-// Entry detection: the handler is called every frame while step 0x2C is
-// current, so a gap between calls means we have re-entered the step. Keying
-// off the `self` pointer instead would resume stale state whenever the macro
-// left the step without us running Finish() (e.g. quit to title mid-recap).
+// A gap between calls means we re-entered the step. Keying off the `self`
+// pointer instead would resume stale state whenever the macro left the step
+// without Finish() running (e.g. quit to title mid-recap).
 constexpr uint64_t kFreshGapMs = 500;
 
-enum class Stage { Fresh, Opening, Showing };
+enum class Stage { Fresh, Opening, Loading, Showing };
 
 Stage    s_stage    = Stage::Fresh;
 int      s_frames   = 0;
 uint64_t s_lastTick = 0;
 void*    s_screen   = nullptr;
 
-// Screen object sizes, taken from each handler's allocation site. Reading past
-// these is an out-of-bounds access, so every diagnostic read is bounded by them.
+// Screen object sizes, from each handler's allocation site. Every diagnostic
+// read is bounded by these so the probe cannot run off the end of the object.
 size_t ScreenSize(int id) {
     if (id == 220) return 0x1C8;   // sub_333260: mov ecx, 0x1C8
     if (id == 225) return 0x220;   // sub_333A40: mov ecx, 0x220
-    return 0;                      // unknown layout - read nothing
+    return 0;
 }
 
-// What we are looking for differs per screen:
-//   220: [+0x1B8] is a result-variant selector its own draw/update switch on
-//        (0..3 valid; the ctor leaves 4, an uninitialised sentinel).
-//   225: [+0x214] gates Draw entirely and is only set once pjs_dlc_result
-//        finishes loading; [+0x1B8]/[+0x1C0] are its layout objects.
-// [+8] is the shared CScreen flags word (bit 0x20 is set on close).
+int ScreenField(int id, uintptr_t o) {
+    const size_t size = ScreenSize(id);
+    if (!s_screen || o + 4 > size) return -1;
+    return *(int*)((unsigned char*)s_screen + o);
+}
+
 void LogScreenState(const char* when, int id) {
     if (!s_screen) return;
-    const size_t size = ScreenSize(id);
-    if (!size) { hoe::Log("  screen %s: unknown screen id %d, not probing", when, id); return; }
-    auto s = (unsigned char*)s_screen;
-
-    auto dw = [&](uintptr_t o) -> long long {
-        return (o + 4 <= size) ? (long long)*(int*)(s + o) : -1LL;
-    };
-    auto qw = [&](uintptr_t o) -> unsigned long long {
-        return (o + 8 <= size) ? *(unsigned long long*)(s + o) : 0ULL;
-    };
-
-    hoe::Log("  screen %s: flags=0x%08X variant[+1B8]=%lld lay[+1C0]=0x%llX "
-             "drawgate[+214]=%lld state[+1D8]=%lld startup[+218]=%lld",
-             when, (unsigned)dw(8), dw(0x1B8), qw(0x1C0), dw(0x214), dw(0x1D8), dw(0x218));
+    if (!ScreenSize(id)) { hoe::Log("  screen %s: unknown id %d, not probing", when, id); return; }
+    hoe::Log("  screen %s: flags=0x%08X loaded[+1A8]=%d variant[+1B8]=%d drawgate[+1C0]=%d",
+             when, (unsigned)ScreenField(id, 8),
+             ScreenField(id, off::C_SCREEN_LOADED_FIELD),
+             ScreenField(id, off::C_SCREEN_VARIANT_FIELD),
+             ScreenField(id, off::C_SCREEN_DRAWGATE_FIELD));
 }
 
 uint64_t ScreenSlot(void* mgr, int screenId) {
-    // screenId is range-checked in config::Load(), so this stays inside the
-    // slot array; the assert documents the invariant for future edits.
+    // screenId is range-checked in config::Load(), so this stays in the array.
     const uintptr_t off = off::C_SCREEN_SLOT_BASE + (uintptr_t)screenId * 8;
     return *(uint64_t*)((unsigned char*)mgr + off);
 }
@@ -105,23 +109,20 @@ void Finish(void* self, const char* why) {
     s_screen = nullptr;
 }
 
-// Optional field dump used to hunt the real kill-count offset. Off by default:
-// it walks a window of a live engine object and is only meaningful while
-// someone is comparing it against a known on-screen score.
+// Optional field dump used to hunt the real score offset. Off by default.
 void DumpCandidates() {
     void* mgr = *game::pMainMgr;
     if (!mgr) { hoe::Log("  diag: no mainMgr"); return; }
     auto action = *(unsigned char**)((unsigned char*)mgr + off::C_ACTION_OFFSET);
     if (!action) { hoe::Log("  diag: no action object"); return; }
 
-    // mainMgr+0xBA0 is a polymorphic "current action" slot written from several
-    // sites, so confirm the concrete type before reading fields off it.
+    // mainMgr+0xBA0 is a polymorphic "current action" slot, so confirm the
+    // concrete type before reading fields off it.
     const void* vft = *(void**)action;
-    const bool isExtra = game::IsColosseumExtra(vft);
-    hoe::Log("  diag: action=%p vftable=%p (%s)", action, vft,
-             isExtra ? "CActionColosseumExtra" : "NOT CActionColosseumExtra");
-    if (!isExtra) return;
-
+    if (!game::IsColosseumExtra(vft)) {
+        hoe::Log("  diag: [mainMgr+0xBA0] is not CActionColosseumExtra, skipping");
+        return;
+    }
     char line[256];
     for (uintptr_t o = 0x180; o + 16 <= kActionSize; o += 16) {
         snprintf(line, sizeof(line), "  diag: +0x%03llX  %11d %11d %11d %11d",
@@ -139,7 +140,7 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
 
     const uint64_t now = GetTickCount64();
     if (s_lastTick == 0 || now - s_lastTick > kFreshGapMs) {
-        s_stage = Stage::Fresh;                 // re-entered the step
+        s_stage = Stage::Fresh;
         s_frames = 0;
     }
     s_lastTick = now;
@@ -152,10 +153,6 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
     case Stage::Fresh: {
         if (cfg.DiagDumpFields) DumpCandidates();
 
-        // NOTE: the kill-count field is NOT yet identified. 0x1A4 was wrong,
-        // and 0x1B4 collided with a 0..7 state selector. ReadKillCount() is
-        // type-checked and returns -1 when it cannot be trusted; recording is
-        // off by default until the field is proven against a known score.
         const int kills = game::ReadKillCount();
         if (cfg.TrackBestScore && kills > 0) {
             const int prev = records::GetBest(kModeBattleKing);
@@ -182,11 +179,7 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
         // argument is 0x1E - not the 0x1D a naive read of the immediate gives.
         game::PostOpenNotify(mission, 0x1E, 0, 1, 1);
 
-        hoe::Log("step 0x2C: OpenScreen(%d) -> %p (slot mainMgr+0x%llX), parent=%p",
-                 cfg.ResultScreenId, scr,
-                 (unsigned long long)(off::C_SCREEN_SLOT_BASE + (uintptr_t)cfg.ResultScreenId * 8),
-                 arg3);
-
+        hoe::Log("step 0x2C: OpenScreen(%d) -> %p, parent=%p", cfg.ResultScreenId, scr, arg3);
         if (!scr) { Finish(self, "OpenScreen returned null"); return; }
 
         s_screen = scr;
@@ -199,38 +192,54 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
     case Stage::Opening: {
         ++s_frames;
         if (ScreenSlot(mgr, cfg.ResultScreenId) != 0) {
-            hoe::Log("step 0x2C: screen registered after %d frames - press A/B to close", s_frames);
+            hoe::Log("step 0x2C: screen registered after %d frames", s_frames);
+            s_stage = Stage::Loading;
+            s_frames = 0;
+            return;
+        }
+        if (s_frames >= kOpenTimeout) Finish(self, "screen slot never populated");
+        return;
+    }
+
+    case Stage::Loading: {
+        ++s_frames;
+        // The setter dereferences the layout page array, so wait for the load.
+        if (ScreenField(cfg.ResultScreenId, off::C_SCREEN_LOADED_FIELD) > 0) {
+            game::SetResultVariant(s_screen, cfg.ResultVariant, cfg.ResultHoldFrames);
+            hoe::Log("step 0x2C: layout loaded after %d frames; "
+                     "SetResultVariant(variant=%d, hold=%d)",
+                     s_frames, cfg.ResultVariant, cfg.ResultHoldFrames);
+            if (cfg.DiagScreenState) LogScreenState("after setter", cfg.ResultScreenId);
             s_stage = Stage::Showing;
             s_frames = 0;
             return;
         }
-        if (s_frames >= kOpenTimeout) {
-            Finish(self, "screen slot never populated (open timeout)");
+        if (cfg.DiagScreenState && s_frames % 60 == 0) {
+            LogScreenState("loading", cfg.ResultScreenId);
+        }
+        if (s_frames >= kLoadTimeout) {
+            LogScreenState("load timeout", cfg.ResultScreenId);
+            Finish(self, "layout never finished loading");
         }
         return;
     }
 
     case Stage::Showing: {
         ++s_frames;
-        if (ScreenSlot(mgr, cfg.ResultScreenId) == 0) {   // closed itself on confirm
-            Finish(self, "player dismissed the results screen");
+        if (ScreenSlot(mgr, cfg.ResultScreenId) == 0) {
+            Finish(self, "screen closed itself");
             return;
         }
-        if (cfg.DiagScreenState && s_frames % 60 == 0 && s_frames <= 600) {
+        if (cfg.DiagScreenState && s_frames % 120 == 0 && s_frames <= 600) {
             char when[32];
-            snprintf(when, sizeof(when), "frame %d", s_frames);
+            snprintf(when, sizeof(when), "showing f%d", s_frames);
             LogScreenState(when, cfg.ResultScreenId);
-        } else if (s_frames % 600 == 0) {
-            hoe::Log("step 0x2C: results on screen, frame %d", s_frames);
         }
-        // 0 disables the timeout. Timing out while the screen is still
-        // registered leaves it on top of gameplay, which is bad - but far less
-        // bad than the unbounded freeze this mod exists to remove.
+        // 0 disables the timeout entirely (wait for the player indefinitely).
         if (cfg.ResultTimeoutSec > 0 &&
             (int64_t)s_frames >= (int64_t)cfg.ResultTimeoutSec * 60) {
-            hoe::Log("step 0x2C: WARNING - screen still registered at timeout; "
-                     "it may linger on screen. Set ResultTimeoutSec=0 if it is dismissible.");
-            Finish(self, "results screen not dismissed within the configured timeout");
+            hoe::Log("step 0x2C: WARNING - screen still registered at timeout; it may linger.");
+            Finish(self, "not dismissed within the configured timeout");
         }
         return;
     }
