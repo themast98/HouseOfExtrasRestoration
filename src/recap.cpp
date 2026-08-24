@@ -55,6 +55,39 @@ enum class Stage { Fresh, Opening, Showing };
 Stage    s_stage    = Stage::Fresh;
 int      s_frames   = 0;
 uint64_t s_lastTick = 0;
+void*    s_screen   = nullptr;
+
+// Screen object sizes, taken from each handler's allocation site. Reading past
+// these is an out-of-bounds access, so every diagnostic read is bounded by them.
+size_t ScreenSize(int id) {
+    if (id == 220) return 0x1C8;   // sub_333260: mov ecx, 0x1C8
+    if (id == 225) return 0x220;   // sub_333A40: mov ecx, 0x220
+    return 0;                      // unknown layout - read nothing
+}
+
+// What we are looking for differs per screen:
+//   220: [+0x1B8] is a result-variant selector its own draw/update switch on
+//        (0..3 valid; the ctor leaves 4, an uninitialised sentinel).
+//   225: [+0x214] gates Draw entirely and is only set once pjs_dlc_result
+//        finishes loading; [+0x1B8]/[+0x1C0] are its layout objects.
+// [+8] is the shared CScreen flags word (bit 0x20 is set on close).
+void LogScreenState(const char* when, int id) {
+    if (!s_screen) return;
+    const size_t size = ScreenSize(id);
+    if (!size) { hoe::Log("  screen %s: unknown screen id %d, not probing", when, id); return; }
+    auto s = (unsigned char*)s_screen;
+
+    auto dw = [&](uintptr_t o) -> long long {
+        return (o + 4 <= size) ? (long long)*(int*)(s + o) : -1LL;
+    };
+    auto qw = [&](uintptr_t o) -> unsigned long long {
+        return (o + 8 <= size) ? *(unsigned long long*)(s + o) : 0ULL;
+    };
+
+    hoe::Log("  screen %s: flags=0x%08X variant[+1B8]=%lld lay[+1C0]=0x%llX "
+             "drawgate[+214]=%lld state[+1D8]=%lld startup[+218]=%lld",
+             when, (unsigned)dw(8), dw(0x1B8), qw(0x1C0), dw(0x214), dw(0x1D8), dw(0x218));
+}
 
 uint64_t ScreenSlot(void* mgr, int screenId) {
     // screenId is range-checked in config::Load(), so this stays inside the
@@ -69,6 +102,7 @@ void Finish(void* self, const char* why) {
     s_stage = Stage::Fresh;
     s_frames = 0;
     s_lastTick = 0;
+    s_screen = nullptr;
 }
 
 // Optional field dump used to hunt the real kill-count offset. Off by default:
@@ -134,7 +168,11 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
         if (!cfg.ShowResultScreen) { Finish(self, "results disabled"); return; }
 
         void* mission = *(void**)((unsigned char*)self + off::C_MISSION_FIELD);
-        game::TransitionSetup(mission, 1, *game::pKFloat, 0, 0);
+        if (cfg.CallTransitionSetup) {
+            game::TransitionSetup(mission, 1, *game::pKFloat, 0, 0);
+        } else {
+            hoe::Log("step 0x2C: TransitionSetup skipped (CallTransitionSetup=0)");
+        }
         game::CommitFlags(*game::pFlagMgr);
 
         void* arg3 = *(void**)((unsigned char*)mgr + off::C_OPENSCREEN_ARG3_FIELD);
@@ -151,6 +189,8 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
 
         if (!scr) { Finish(self, "OpenScreen returned null"); return; }
 
+        s_screen = scr;
+        if (cfg.DiagScreenState) LogScreenState("at open", cfg.ResultScreenId);
         s_stage = Stage::Opening;
         s_frames = 0;
         return;
@@ -176,7 +216,11 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
             Finish(self, "player dismissed the results screen");
             return;
         }
-        if (s_frames % 600 == 0) {
+        if (cfg.DiagScreenState && s_frames % 60 == 0 && s_frames <= 600) {
+            char when[32];
+            snprintf(when, sizeof(when), "frame %d", s_frames);
+            LogScreenState(when, cfg.ResultScreenId);
+        } else if (s_frames % 600 == 0) {
             hoe::Log("step 0x2C: results on screen, frame %d", s_frames);
         }
         // 0 disables the timeout. Timing out while the screen is still

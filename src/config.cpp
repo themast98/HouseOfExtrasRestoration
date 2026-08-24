@@ -62,7 +62,14 @@ void WriteDefaults(const char* p) {
         "TrackBestScore=0\n"
         "\n;  1 = dump candidate object fields to the log at results time.\n"
         ";  Only useful while hunting the score offset against a known score.\n"
-        "DiagDumpFields=0\n", f);
+        "DiagDumpFields=0\n"
+        "\n;  1 = log the result screen's own state machine once a second, so we can\n"
+        ";  tell whether the engine is actually updating it or it is inert.\n"
+        "DiagScreenState=1\n"
+        "\n;  1 = call the transition/fade helper the reference handler calls before\n"
+        ";  opening the screen. Set to 0 to test whether that fade is what leaves the\n"
+        ";  display black with the screen up.\n"
+        "CallTransitionSetup=1\n", f);
     fclose(f);
 }
 
@@ -81,6 +88,9 @@ Settings Load() {
     s.ResultTimeoutSec = GetPrivateProfileIntA("Results", "ResultTimeoutSec", s.ResultTimeoutSec, p);
     s.TrackBestScore   = GetPrivateProfileIntA("Results", "TrackBestScore",   s.TrackBestScore,   p);
     s.DiagDumpFields   = GetPrivateProfileIntA("Results", "DiagDumpFields",   s.DiagDumpFields,   p);
+    s.DiagScreenState  = GetPrivateProfileIntA("Results", "DiagScreenState",  s.DiagScreenState,  p);
+    s.CallTransitionSetup =
+        GetPrivateProfileIntA("Results", "CallTransitionSetup", s.CallTransitionSetup, p);
 
     // An unvalidated id indexes the screen-slot array (mainMgr + 0x1E8 + id*8).
     // slot(311) lands exactly on mainMgr+0xBA0, so 310 is the hard ceiling.
