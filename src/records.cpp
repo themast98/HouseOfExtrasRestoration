@@ -12,6 +12,15 @@ Entry g[32];
 int   gCount = 0;
 bool  gLoaded = false;
 
+// No House of Extras run can plausibly exceed this. Anything above it did not
+// come from real play - an early build of this mod wrote 1932486006 after
+// reading the wrong object field. Such a value would otherwise sit in the file
+// forever as an unbeatable "best" and silently mask every correct score, so it
+// is rejected on BOTH load and store and the file heals itself on next write.
+constexpr int kMaxPlausibleScore = 9999;
+
+bool Plausible(int score) { return score > 0 && score <= kMaxPlausibleScore; }
+
 const char* Path() {
     static char path[MAX_PATH] = {};
     if (!path[0]) {
@@ -31,7 +40,12 @@ void Load() {
     while (fgets(line, sizeof(line), f) && gCount < 32) {
         if (line[0] == '#' || line[0] == '\n') continue;
         int k = 0, v = 0;
-        if (sscanf(line, "%d=%d", &k, &v) == 2) { g[gCount].mode = k; g[gCount].score = v; ++gCount; }
+        if (sscanf(line, "%d=%d", &k, &v) != 2) continue;
+        if (!Plausible(v)) {
+            hoe::Log("records: discarding implausible stored best %d=%d", k, v);
+            continue;   // dropped here, and gone from the file on the next Save()
+        }
+        g[gCount].mode = k; g[gCount].score = v; ++gCount;
     }
     fclose(f);
 }
@@ -54,6 +68,10 @@ int GetBest(int modeId) {
 
 bool SetBest(int modeId, int score) {
     Load();
+    if (!Plausible(score)) {
+        hoe::Log("records: refusing to store implausible score %d for mode %d", score, modeId);
+        return false;
+    }
     if (score <= GetBest(modeId)) return false;
     for (int i = 0; i < gCount; ++i) {
         if (g[i].mode == modeId) { g[i].score = score; Save(); return true; }
