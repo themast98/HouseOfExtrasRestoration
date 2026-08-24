@@ -96,6 +96,25 @@ def test_anchor_pattern_is_unique_and_correct(img, offsets):
     assert hits[0] + TEXT_LO == int(a["expect_rva"], 16)
 
 
+def test_standalone_patterns_are_unique_and_correct(img, offsets):
+    """Every entry in the `patterns` block must match exactly once in .text and
+    land on its expected RVA. Wildcards ('?') are allowed and are how we keep
+    rel32 / RIP-relative bytes out of a signature."""
+    pats = offsets.get("patterns", {})
+    assert pats, "no standalone patterns declared"
+    text = img[TEXT_LO:TEXT_HI]
+    for name, p in pats.items():
+        rx = b"".join(
+            b"." if t == "?" else re.escape(bytes([int(t, 16)]))
+            for t in p["pattern"].split()
+        )
+        hits = [m.start() + TEXT_LO for m in re.finditer(rx, text, re.S)]
+        assert len(hits) == 1, f"{name}: {len(hits)} hits, need exactly 1"
+        assert hits[0] == int(p["expect_rva"], 16), (
+            f"{name}: matched 0x{hits[0]:X}, expected {p['expect_rva']}"
+        )
+
+
 def test_anchor_calls_resolve(img, offsets):
     base = int(offsets["anchor"]["expect_rva"], 16)
     for name, c in offsets["anchor"]["calls"].items():

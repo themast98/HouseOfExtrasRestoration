@@ -266,6 +266,15 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
             Finish(self, "screen closed itself");
             return;
         }
+        // Screen 220 is a TIMED BANNER, not an interactive panel: it has no
+        // confirm-button state (that belongs to screen 225), and it never clears
+        // its own slot. It simply shuts its draw gate once ResultHoldFrames have
+        // elapsed. Waiting on the slot therefore always ran to the timeout, so
+        // treat the gate closing as the natural end of the banner.
+        if (ScreenField(cfg.ResultScreenId, off::C_SCREEN_DRAWGATE_FIELD) == 0) {
+            Finish(self, "banner finished (draw gate closed)");
+            return;
+        }
         if (cfg.DiagScreenState && s_frames % 120 == 0 && s_frames <= 600) {
             char when[32];
             snprintf(when, sizeof(when), "showing f%d", s_frames);

@@ -37,6 +37,24 @@ constexpr uintptr_t EXPECT_K_FLOAT = 0x122D46C;
 // ---- standalone byte patterns ----
 constexpr char PATTERN_SET_RESULT_VARIANT[] = "48 83 EC 28 89 91 B8 01 00 00 44 89 81 BC 01 00 00";
 constexpr uintptr_t EXPECT_SET_RESULT_VARIANT = 0x3A46D0;
+constexpr char PATTERN_HEAP_PUSH[] = "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 30 48 63 05";
+constexpr uintptr_t EXPECT_HEAP_PUSH = 0x3C6530;
+constexpr char PATTERN_HEAP_ALLOC[] = "48 89 4C 24 08 57 48 83 EC 30 48 C7 44 24 20 FE FF FF FF 48 89 5C 24 50 48 8B 05";
+constexpr uintptr_t EXPECT_HEAP_ALLOC = 0x3C6230;
+constexpr char PATTERN_HEAP_POP[] = "48 83 EC 38 8B 05 ? ? ? ? 48 8D";
+constexpr uintptr_t EXPECT_HEAP_POP = 0x3C69C0;
+constexpr char PATTERN_LAYOUT_LOAD[] = "4C 8B DC 56 41 54 41 56 48";
+constexpr uintptr_t EXPECT_LAYOUT_LOAD = 0x483AA0;
+constexpr char PATTERN_NETRANK_CTOR[] = "33 C0 33 D2 48 89 11 48 89 41";
+constexpr uintptr_t EXPECT_NETRANK_CTOR = 0x85DE90;
+constexpr char PATTERN_NETRANK_LOADLAYOUT[] = "40 53 48 83 EC 30 48 C7 44 24 20 FE FF FF FF 48 8B D9 B9 28 01 00 00 E8 ? ? ? ? 48 89 44 24 40 48 85 C0 74 13";
+constexpr uintptr_t EXPECT_NETRANK_LOADLAYOUT = 0x85E110;
+constexpr char PATTERN_NETRANK_BIND[] = "48 89 5C 24 10 57 48 83 EC 20 48 8B D9 33 FF 48 8B 09";
+constexpr uintptr_t EXPECT_NETRANK_BIND = 0x85E330;
+constexpr char PATTERN_NETRANK_SHOW[] = "48 89 5C 24 08 57 48 83 EC 20 48 63 DA 48 8B F9 45 85 C0 75 2A 8B D3 E8 ? ? ? ? 85 C0 74 48 48 8B 4C DF 08";
+constexpr uintptr_t EXPECT_NETRANK_SHOW = 0x85E020;
+constexpr char PATTERN_NETRANK_DRAW[] = "40 53 48 83 EC 20 33 D2 48 8B D9 E8 ? ? ? ? 85 C0 74 38";
+constexpr uintptr_t EXPECT_NETRANK_DRAW = 0x85DEC0;
 
 // ---- RTTI: type descriptor -> COL -> vftable -> slot ----
 constexpr char TYPENAME_COLOSSEUM_EXTRA[] = ".?AVCMissionMacroColosseumExtra@@";
@@ -72,5 +90,9 @@ constexpr uintptr_t C_LAYOUT_PAGE_STRIDE = 0x30;
 constexpr uintptr_t C_PAGE_ELEM_FIELD = 0x10;
 constexpr uintptr_t C_ELEM_FLAGS_FIELD = 0x2C;
 constexpr uintptr_t C_ELEM_SUPPRESS_FIELD = 0xBC;
+constexpr uintptr_t C_NETRANK_PANEL_SIZE = 0x28;
+constexpr uintptr_t C_NETRANK_LAYOUT_SIZE = 0x128;
+constexpr uintptr_t C_NETRANK_VALUE_FIELD = 0x20;
+constexpr uintptr_t C_HEAP_ID_UI = 10;
 
 }  // namespace off
