@@ -65,9 +65,10 @@ void WriteDefaults(const char* p) {
         ";  0 = wait indefinitely (only if you are sure the screen is dismissible).\n"
         "ResultTimeoutSec=120\n"
         "\n;  1 = track best score per mode in HouseOfExtras.records\n"
-        ";  Currently 0: the in-memory score field has NOT been identified yet, so\n"
-        ";  enabling this would persist a meaningless number.\n"
-        "TrackBestScore=0\n"
+        ";  The score field is CActionColosseumExtra+0x208, confirmed against runs\n"
+        ";  of 3, 4 and 6 defeated enemies. Scores outside 1..9999 are rejected on\n"
+        ";  both read and write, so a bad value cannot become a permanent 'best'.\n"
+        "TrackBestScore=1\n"
         "\n;  1 = dump candidate object fields to the log at results time.\n"
         ";  Only useful while hunting the score offset against a known score.\n"
         "DiagDumpFields=0\n"
@@ -77,7 +78,13 @@ void WriteDefaults(const char* p) {
         "\n;  1 = call the transition/fade helper the reference handler calls before\n"
         ";  opening the screen. Set to 0 to test whether that fade is what leaves the\n"
         ";  display black with the screen up.\n"
-        "CallTransitionSetup=1\n", f);
+        "CallTransitionSetup=1\n"
+        "\n;  1 = after opening the screen, ask the engine to fade back IN.\n"
+        ";  Something earlier in the battle-end flow already fades to opaque black,\n"
+        ";  and skipping our own fade call does not undo it. This actively clears the\n"
+        ";  overlay, so if the results panel then appears it was merely underneath it.\n"
+        ";  Diagnostic aid - the black background is correct in the original game.\n"
+        "ForceFadeIn=0\n", f);
     fclose(f);
 }
 
@@ -101,6 +108,7 @@ Settings Load() {
     s.DiagScreenState  = GetPrivateProfileIntA("Results", "DiagScreenState",  s.DiagScreenState,  p);
     s.CallTransitionSetup =
         GetPrivateProfileIntA("Results", "CallTransitionSetup", s.CallTransitionSetup, p);
+    s.ForceFadeIn      = GetPrivateProfileIntA("Results", "ForceFadeIn",      s.ForceFadeIn,      p);
 
     // An unvalidated id indexes the screen-slot array (mainMgr + 0x1E8 + id*8).
     // slot(311) lands exactly on mainMgr+0xBA0, so 310 is the hard ceiling.

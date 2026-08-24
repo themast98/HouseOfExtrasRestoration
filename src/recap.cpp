@@ -94,6 +94,29 @@ void LogScreenState(const char* when, int id) {
              ScreenField(id, off::C_SCREEN_DRAWGATE_FIELD));
 }
 
+// Walk screen -> layout -> page[variant] -> element and report the two flags
+// that decide whether anything is actually rasterised:
+//   elem[+0x2C] bit 0 - armed by the layout's "in" animation; the element
+//                       updater returns immediately unless it is set
+//   elem[+0xBC]       - non-zero suppresses the draw
+// The gate at screen+0x1C0 being open only means Draw is entered; these decide
+// whether it puts pixels anywhere.
+void LogElementState(const char* when, int variant) {
+    if (!s_screen) return;
+    auto scr = (unsigned char*)s_screen;
+    auto layout = *(unsigned char**)(scr + off::C_SCREEN_LAYOUT_FIELD);
+    if (!layout) { hoe::Log("  elem %s: layout is NULL", when); return; }
+    auto pages = *(unsigned char**)(layout + off::C_LAYOUT_PAGE_ARRAY);
+    if (!pages) { hoe::Log("  elem %s: page array is NULL", when); return; }
+    auto page = pages + (uintptr_t)variant * off::C_LAYOUT_PAGE_STRIDE;
+    auto elem = *(unsigned char**)(page + off::C_PAGE_ELEM_FIELD);
+    if (!elem) { hoe::Log("  elem %s: page %d element is NULL", when, variant); return; }
+    const unsigned flags = *(unsigned*)(elem + off::C_ELEM_FLAGS_FIELD);
+    hoe::Log("  elem %s: layout=%p page%d=%p elem=%p flags[+2C]=0x%08X armed=%d suppress[+BC]=%d",
+             when, layout, variant, page, elem, flags, (flags & 1) ? 1 : 0,
+             *(int*)(elem + off::C_ELEM_SUPPRESS_FIELD));
+}
+
 uint64_t ScreenSlot(void* mgr, int screenId) {
     // screenId is range-checked in config::Load(), so this stays in the array.
     const uintptr_t off = off::C_SCREEN_SLOT_BASE + (uintptr_t)screenId * 8;
@@ -182,6 +205,16 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
         hoe::Log("step 0x2C: OpenScreen(%d) -> %p, parent=%p", cfg.ResultScreenId, scr, arg3);
         if (!scr) { Finish(self, "OpenScreen returned null"); return; }
 
+        // Test aid. Something EARLIER in the battle-end flow already faded the
+        // screen to opaque black - skipping our own mode-1 call does not undo it.
+        // mode 0 targets alpha 0, which lets the fade state machine finish and
+        // switch the overlay off entirely (state -> 0 stops it being drawn at
+        // all). If the panel then appears, it was simply underneath the fade.
+        if (cfg.ForceFadeIn) {
+            game::TransitionSetup(mission, 0, 1.0f, 0, 1);
+            hoe::Log("step 0x2C: ForceFadeIn - requested fade to transparent");
+        }
+
         s_screen = scr;
         if (cfg.DiagScreenState) LogScreenState("at open", cfg.ResultScreenId);
         s_stage = Stage::Opening;
@@ -209,7 +242,10 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
             hoe::Log("step 0x2C: layout loaded after %d frames; "
                      "SetResultVariant(variant=%d, hold=%d)",
                      s_frames, cfg.ResultVariant, cfg.ResultHoldFrames);
-            if (cfg.DiagScreenState) LogScreenState("after setter", cfg.ResultScreenId);
+            if (cfg.DiagScreenState) {
+                LogScreenState("after setter", cfg.ResultScreenId);
+                LogElementState("after setter", cfg.ResultVariant);
+            }
             s_stage = Stage::Showing;
             s_frames = 0;
             return;
@@ -234,6 +270,7 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
             char when[32];
             snprintf(when, sizeof(when), "showing f%d", s_frames);
             LogScreenState(when, cfg.ResultScreenId);
+            LogElementState(when, cfg.ResultVariant);
         }
         // 0 disables the timeout entirely (wait for the player indefinitely).
         if (cfg.ResultTimeoutSec > 0 &&

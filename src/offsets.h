@@ -57,7 +57,7 @@ constexpr uintptr_t C_SCREEN_RESULT = 220;
 constexpr uintptr_t C_STEP_2D = 45;
 constexpr uintptr_t C_STEP_2E = 46;
 constexpr uintptr_t C_ACTION_OFFSET = 0xBA0;
-constexpr uintptr_t C_KILL_COUNT_OFFSET = 0x1B4;
+constexpr uintptr_t C_KILL_COUNT_OFFSET = 0x208;
 constexpr uintptr_t C_CUR_STEP_FIELD = 0x128;
 constexpr uintptr_t C_NEXT_STEP_FIELD = 0x12C;
 constexpr uintptr_t C_MISSION_FIELD = 0x8;
@@ -66,5 +66,11 @@ constexpr uintptr_t C_SCREEN_SLOT_BASE = 0x1E8;
 constexpr uintptr_t C_SCREEN_LOADED_FIELD = 0x1A8;
 constexpr uintptr_t C_SCREEN_VARIANT_FIELD = 0x1B8;
 constexpr uintptr_t C_SCREEN_DRAWGATE_FIELD = 0x1C0;
+constexpr uintptr_t C_SCREEN_LAYOUT_FIELD = 0x1B0;
+constexpr uintptr_t C_LAYOUT_PAGE_ARRAY = 0x110;
+constexpr uintptr_t C_LAYOUT_PAGE_STRIDE = 0x30;
+constexpr uintptr_t C_PAGE_ELEM_FIELD = 0x10;
+constexpr uintptr_t C_ELEM_FLAGS_FIELD = 0x2C;
+constexpr uintptr_t C_ELEM_SUPPRESS_FIELD = 0xBC;
 
 }  // namespace off

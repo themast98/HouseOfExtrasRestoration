@@ -6,11 +6,12 @@ struct Settings {
     int ResultScreenId   = 220; // 220 = pjs_dlc_survivalbtl_end (the Extras results screen)
     int ResultVariant    = 0;   // 0..3 - which result page of the layout to show
     int ResultHoldFrames = 180; // frames the screen holds before playing its "out" anim
-    int TrackBestScore   = 0;   // off: the score field is not yet identified
+    int TrackBestScore   = 1;   // CActionColosseumExtra+0x208, confirmed 3/4/6
     int DiagDumpFields   = 0;   // dump candidate offsets to the log
     int ResultTimeoutSec = 120; // seconds; 0 = wait indefinitely
     int DiagScreenState  = 1;   // log the result screen's own state each second
     int CallTransitionSetup = 1; // mirror the reference handler's fade call
+    int ForceFadeIn      = 0;   // after opening, fade the screen back IN (test aid)
 };
 const Settings& Get();   // reads HouseOfExtras.ini once, writes defaults if absent
 }
