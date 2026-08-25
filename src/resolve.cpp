@@ -303,12 +303,12 @@ Resolved Build() {
     // split is the leading explanation for a screen that opens, registers,
     // animates and holds while rendering nothing at all, so we report it.
     if (uintptr_t bind = FindPattern(off::ANCHOR_NETRANK_BIND_PATTERN)) {
-        r.LayoutIsLoading = ReadCall(bind + off::CALLAT_LAYOUT_IS_LOADING);
+        r.LayoutHasPages  = ReadCall(bind + off::CALLAT_LAYOUT_IS_LOADING);
         r.LayoutPageReady = ReadCall(bind + off::CALLAT_LAYOUT_PAGE_READY);
         r.LayoutGetPane   = ReadCall(bind + off::CALLAT_LAYOUT_GET_PANE);
         r.GLayoutRes      = ReadRipRef(bind + off::RIPAT_G_LAYOUT_RES,
                                        off::RIPLEN_G_LAYOUT_RES);
-        Check("LayoutIsLoading", r.LayoutIsLoading, off::EXPECT_LAYOUT_IS_LOADING);
+        Check("LayoutHasPages",  r.LayoutHasPages,  off::EXPECT_LAYOUT_IS_LOADING);
         Check("LayoutPageReady", r.LayoutPageReady, off::EXPECT_LAYOUT_PAGE_READY);
         Check("LayoutGetPane",   r.LayoutGetPane,   off::EXPECT_LAYOUT_GET_PANE);
         Check("GLayoutRes",      r.GLayoutRes,      off::EXPECT_G_LAYOUT_RES);
@@ -319,7 +319,7 @@ Resolved Build() {
             Check("GLayoutTexPar", r.GLayoutTexPar, off::C_G_LAYOUT_TEXPAR_EXPECT);
         }
 
-        r.layoutDiagOk = InImage(r.LayoutIsLoading) && InImage(r.LayoutPageReady) &&
+        r.layoutDiagOk = InImage(r.LayoutHasPages) && InImage(r.LayoutPageReady) &&
                          InImage(r.LayoutGetPane)  && InImage(r.GLayoutRes) &&
                          InImage(r.GLayoutTexPar);
     }

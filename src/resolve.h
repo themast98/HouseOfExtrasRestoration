@@ -48,7 +48,10 @@ struct Resolved {
     // Layout introspection, via the NETRANK_BIND anchor. Diagnostics only - it
     // answers why a layout can be live, animating and draw-gated open yet put
     // no pixels on screen. Optional; `ok` does not depend on it.
-    uintptr_t LayoutIsLoading = 0;   // sub_4843E0(layout) -> nonzero while loading
+    // sub_4843E0(layout) is `return layout->pages != NULL` - it is NOT an
+    // is-loading check. Named for what it does, after the first name misread the
+    // live log: pages!=NULL is the healthy state, not a stalled one.
+    uintptr_t LayoutHasPages  = 0;   // sub_4843E0(layout)
     uintptr_t LayoutPageReady = 0;   // sub_484510(layout, page) -> nonzero when ready
     uintptr_t LayoutGetPane   = 0;   // sub_484220(layout, index) -> pane
     uintptr_t GLayoutRes      = 0;   // per-layout resource table, stride 0x70

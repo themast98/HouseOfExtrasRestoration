@@ -14,9 +14,12 @@ PostOpenNotifyFn  PostOpenNotify  = nullptr;
 SetResultVariantFn SetResultVariant = nullptr;
 SetFlagAliasFn    SetFlagAlias    = nullptr;
 IsDlcOwnedFn      IsDlcOwned      = nullptr;
-LayoutIsLoadingFn LayoutIsLoading = nullptr;
+LayoutHasPagesFn  LayoutHasPages  = nullptr;
 LayoutPageReadyFn LayoutPageReady = nullptr;
-static unsigned char* s_layoutRes    = nullptr;
+// The RVA holds a POINTER to the resource table, so this is a void** we must
+// dereference each time; the texture table at the neighbouring RVA is the
+// array itself. Getting these two the same way was the original bug.
+static void**         s_pLayoutRes   = nullptr;
 static void**         s_layoutTexPar = nullptr;
 static void**         s_pMissionMgr  = nullptr;
 void**            pMainMgr        = nullptr;
@@ -44,9 +47,9 @@ bool Bind() {
     }
     if (r.missionDiagOk) s_pMissionMgr = (void**)(b + r.GMissionMgr);
     if (r.layoutDiagOk) {
-        LayoutIsLoading = (LayoutIsLoadingFn)(b + r.LayoutIsLoading);
+        LayoutHasPages  = (LayoutHasPagesFn) (b + r.LayoutHasPages);
         LayoutPageReady = (LayoutPageReadyFn)(b + r.LayoutPageReady);
-        s_layoutRes     = (unsigned char*)   (b + r.GLayoutRes);
+        s_pLayoutRes    = (void**)           (b + r.GLayoutRes);
         s_layoutTexPar  = (void**)           (b + r.GLayoutTexPar);
     }
     return true;
@@ -106,55 +109,65 @@ bool UnlockExtraModes() {
     return true;
 }
 
-// A layout carries an index into a global resource table (stride 0x70), whose
-// +0x18 field is how many elements the engine registered for it. The matching
-// slot in a *second* table holds the layout's texture archive - loaded by a
-// separate path that LoadLayout never invokes. A non-zero element count with a
-// null texture handle is the signature of a layout that runs perfectly and
-// draws nothing, which is exactly what screen 220 does.
+// Reports the layout's slot state.
+//
+// The resource table is reached through a POINTER at its RVA, not stored there:
+// the engine's own access is `mov rax, qword ptr [rip+disp]` (a load) and boot
+// writes a heap pointer into it. The first version of this function used the RVA
+// as the table base, read unrelated static memory that happens to be zero, and
+// duly reported an "empty resource entry" that did not exist. The neighbouring
+// texture table really is in-place (`mov rcx,[r14+rsi*8+disp]`, r14 = image
+// base), so those two are dereferenced differently on purpose.
 bool LogLayoutResources(const char* when, void* layout) {
     if (!layout) { hoe::Log("  layoutres %s: layout is NULL", when); return false; }
-    if (!s_layoutRes || !s_layoutTexPar) {
+    if (!s_pLayoutRes || !s_layoutTexPar) {
         hoe::Log("  layoutres %s: diagnostics did not resolve", when);
         return false;
     }
-    auto l = (unsigned char*)layout;
-    const int idx = *(int*)(l + off::C_LAYOUT_RES_INDEX_FIELD);
-    // Layout slots are few: three parallel per-slot tables sit back to back,
-    // and the tightest gap (the dword table at 0x19809E0 ending exactly where
-    // the texture table begins) puts the capacity at 40. An unbounded index
-    // here would read well past the table into unrelated globals.
-    if (idx < 0 || idx >= (int)off::C_LAYOUT_SLOT_COUNT) {
-        hoe::Log("  layoutres %s: resource index %d outside the %d-slot tables",
-                 when, idx, (int)off::C_LAYOUT_SLOT_COUNT);
+    auto table = (unsigned char*)*s_pLayoutRes;      // <- the deref that was missing
+    if (!table) {
+        hoe::Log("  layoutres %s: resource table pointer is NULL (layout system "
+                 "not initialised yet)", when);
         return false;
     }
-    auto entry = s_layoutRes + (uintptr_t)idx * off::C_LAYOUT_RES_STRIDE;
-    const int elems = *(int*)(entry + off::C_LAYOUT_RES_COUNT_FIELD);
-    void* tex = s_layoutTexPar[idx];
-    const int loading = LayoutIsLoading ? LayoutIsLoading(layout) : -1;
-    const int ready   = LayoutPageReady ? LayoutPageReady(layout, 0) : -1;
 
-    hoe::Log("  layoutres %s: idx=%d elems[+18]=%d texpar=%p loading=%d page0ready=%d",
-             when, idx, elems, tex, loading, ready);
-
-    // The field meanings come from one caller (the network-ranking binder), so
-    // rather than assert a conclusion we cannot yet back, dump the raw entry.
-    // Whatever the fields turn out to mean, the evidence is in the log.
-    char hex[3 * 32 + 1];
-    for (int i = 0; i < 32; ++i) {
-        static const char* d = "0123456789ABCDEF";
-        hex[i * 3] = d[entry[i] >> 4];
-        hex[i * 3 + 1] = d[entry[i] & 0xF];
-        hex[i * 3 + 2] = (i == 15) ? '|' : ' ';
+    auto l = (unsigned char*)layout;
+    const int idx = *(int*)(l + off::C_LAYOUT_RES_INDEX_FIELD);
+    // Slot -1 means "no free slot was available" and is a real engine outcome,
+    // so it must be reported rather than indexed with.
+    if (idx < 0 || idx >= (int)off::C_LAYOUT_SLOT_COUNT) {
+        hoe::Log("  layoutres %s: slot %d outside the %d-slot tables%s",
+                 when, idx, (int)off::C_LAYOUT_SLOT_COUNT,
+                 idx == -1 ? " (-1 = the engine found no free slot)" : "");
+        return false;
     }
-    hex[3 * 32] = 0;
-    hoe::Log("  layoutres %s: entry %s", when, hex);
-    if (!tex) {
-        hoe::Log("  layoutres %s: HYPOTHESIS - no texture archive in this layout's "
-                 "slot. LoadLayout only reads <name>.csb; textures come from a "
-                 "separate loader. That would explain a live, animating, "
-                 "draw-gated layout rendering nothing.", when);
+
+    auto entry = table + (uintptr_t)idx * off::C_LAYOUT_RES_STRIDE;
+    const unsigned resFlags = *(unsigned*)(entry + off::C_RES_FLAGS_FIELD);
+    void* csb              = *(void**)(entry + off::C_RES_CSB_FIELD);
+    const int pageCount    = *(int*)(entry + off::C_LAYOUT_RES_COUNT_FIELD);
+    void* tex              = s_layoutTexPar[idx];
+    const unsigned lFlags  = *(unsigned*)(l + off::C_LAYOUT_FLAGS_FIELD);
+    auto name              = (const char*)(l + off::C_LAYOUT_NAME_FIELD);
+
+    hoe::Log("  layoutres %s: slot=%d name='%.48s'", when, idx, name);
+    hoe::Log("  layoutres %s: res.flags=0x%X (1=published 2=borrowed 4=awaiting.par "
+             "8=csb-says-no-textures) csb=%p pages[+18]=%d texpar=%p",
+             when, resFlags, csb, pageCount, tex);
+    // Deliberately NOT calling sub_484510 here. It is a one-shot page BUILDER,
+    // not a readiness test - on a layout whose bit0 is clear it would allocate
+    // and populate the page vector as a side effect, using whatever `kind` we
+    // guessed, silently changing element behaviour. Bit0 of layout.flags is the
+    // same information for free, so a diagnostic reads that instead.
+    hoe::Log("  layoutres %s: layout.flags=0x%X (bit0=pages built) haspages=%d",
+             when, lFlags, LayoutHasPages ? LayoutHasPages(layout) : -1);
+
+    if (resFlags & 8) {
+        hoe::Log("  layoutres %s: the csb itself declares NO TEXTURES for this "
+                 "layout - that alone would explain empty rendering", when);
+    } else if (!tex) {
+        hoe::Log("  layoutres %s: no texture archive in this slot while the csb "
+                 "does not claim to be texture-free", when);
     }
     return true;
 }

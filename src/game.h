@@ -14,7 +14,7 @@ using SetResultVariantFn = void(*)(void* screen, int variant, int holdFrames);
 // (332, 30) keeps us correct even if a rebuild renumbers flag groups.
 using SetFlagAliasFn     = void(*)(void* flagMgr, int alias, int value);
 using IsDlcOwnedFn       = bool(*)(void* ignored, int bit);
-using LayoutIsLoadingFn  = int(*)(void* layout);
+using LayoutHasPagesFn   = int(*)(void* layout);
 using LayoutPageReadyFn  = int(*)(void* layout, int page);
 
 extern TransitionSetupFn TransitionSetup;
@@ -23,6 +23,8 @@ extern OpenScreenFn      OpenScreen;
 extern SetNextStepFn     SetNextStep;
 extern PostOpenNotifyFn  PostOpenNotify;
 extern SetResultVariantFn SetResultVariant;
+extern LayoutHasPagesFn  LayoutHasPages;
+extern LayoutPageReadyFn LayoutPageReady;
 extern SetFlagAliasFn    SetFlagAlias;
 extern IsDlcOwnedFn      IsDlcOwned;
 extern void**            pMainMgr;

@@ -139,5 +139,9 @@ constexpr uintptr_t C_LAYOUT_SLOT_COUNT = 40;
 constexpr uintptr_t C_MISSIONMGR_MACRO_FIELD = 0x58;
 constexpr uintptr_t C_MISSIONMGR_STATE_FIELD = 0x30;
 constexpr uintptr_t C_MACRO_ID_FIELD = 0x84;
+constexpr uintptr_t C_LAYOUT_NAME_FIELD = 0xC;
+constexpr uintptr_t C_LAYOUT_FLAGS_FIELD = 0x118;
+constexpr uintptr_t C_RES_FLAGS_FIELD = 0x0;
+constexpr uintptr_t C_RES_CSB_FIELD = 0x8;
 
 }  // namespace off

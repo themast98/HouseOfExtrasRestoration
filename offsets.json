@@ -123,7 +123,11 @@
     "LAYOUT_SLOT_COUNT": 40,
     "MISSIONMGR_MACRO_FIELD": "0x58",
     "MISSIONMGR_STATE_FIELD": "0x30",
-    "MACRO_ID_FIELD": "0x84"
+    "MACRO_ID_FIELD": "0x84",
+    "LAYOUT_NAME_FIELD": "0xC",
+    "LAYOUT_FLAGS_FIELD": "0x118",
+    "RES_FLAGS_FIELD": "0x0",
+    "RES_CSB_FIELD": "0x8"
   },
   "patterns": {
     "SET_RESULT_VARIANT": {
@@ -229,7 +233,8 @@
         "G_LAYOUT_RES": {
           "at": "0x3C",
           "len": 7,
-          "expect_rva": "0x1980D18"
+          "expect_rva": "0x1980D18",
+          "comment": "IMPORTANT: this RVA holds a POINTER to the table, not the table. The access is `mov rax, qword ptr [rip+disp]` - a load - and boot stores a heap pointer here (0x48745F). Treating it as the array base reads unrelated static memory that happens to be zero, which is exactly the false 'empty resource entry' the first version of this diagnostic reported."
         }
       }
     },
