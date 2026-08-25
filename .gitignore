@@ -3,3 +3,5 @@ refs/*.bin
 *.asi
 *.log
 *.records
+__pycache__/
+*.pyc
