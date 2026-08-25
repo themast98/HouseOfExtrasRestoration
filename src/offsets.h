@@ -56,6 +56,11 @@ constexpr uintptr_t EXPECT_LAYOUT_GET_PANE = 0x484220;
 constexpr uintptr_t RIPAT_G_LAYOUT_RES = 0x3C;
 constexpr uintptr_t RIPLEN_G_LAYOUT_RES = 7;
 constexpr uintptr_t EXPECT_G_LAYOUT_RES = 0x1980D18;
+constexpr char ANCHOR_MISSION_TICK_PATTERN[] = "48 8B 4B 50 48 85 C9 0F 84 ? ? ? ? 48 39";
+constexpr uintptr_t EXPECT_MISSION_TICK = 0xB6AD7D;
+constexpr uintptr_t RIPAT_G_MISSION_MGR = 0x2C1;
+constexpr uintptr_t RIPLEN_G_MISSION_MGR = 7;
+constexpr uintptr_t EXPECT_G_MISSION_MGR = 0x1A195E0;
 
 // ---- standalone byte patterns ----
 constexpr char PATTERN_SET_RESULT_VARIANT[] = "48 83 EC 28 89 91 B8 01 00 00 44 89 81 BC 01 00 00";
@@ -131,5 +136,8 @@ constexpr uintptr_t C_LAYOUT_RES_STRIDE = 0x70;
 constexpr uintptr_t C_LAYOUT_RES_COUNT_FIELD = 0x18;
 constexpr uintptr_t C_G_LAYOUT_STATE_EXPECT = 0x19809E0;
 constexpr uintptr_t C_LAYOUT_SLOT_COUNT = 40;
+constexpr uintptr_t C_MISSIONMGR_MACRO_FIELD = 0x58;
+constexpr uintptr_t C_MISSIONMGR_STATE_FIELD = 0x30;
+constexpr uintptr_t C_MACRO_ID_FIELD = 0x84;
 
 }  // namespace off

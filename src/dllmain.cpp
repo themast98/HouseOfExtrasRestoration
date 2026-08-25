@@ -51,8 +51,10 @@ static bool InstallPatches() {
 // running at any point afterwards.
 static DWORD WINAPI UnlockLoop(LPVOID) {
     using namespace hoe;
+    const auto& cfg = config::Get();
     bool announced = false;
     for (;;) {
+        if (cfg.DiagMissionWatch) game::PollMissionState();
         if (game::UnlockExtraModes() && !announced) {
             announced = true;
             if (game::IsDlcOwned) {
@@ -90,10 +92,16 @@ static DWORD WINAPI Init(LPVOID) {
         Log("UnlockAllModes=0 - leaving Bob's menu as the PC build ships it");
     } else if (!resolve::Get().unlockOk) {
         Log("UnlockAllModes=1 but the flag setter did not resolve - menu unchanged");
-    } else if (HANDLE t = CreateThread(nullptr, 0, UnlockLoop, nullptr, 0, nullptr)) {
-        CloseHandle(t);
-    } else {
-        Log("could not start the unlock thread - menu unchanged");
+    }
+    // The same slow heartbeat drives the unlock and the mission watcher, so it
+    // starts if either is wanted - the watcher is what makes a mode that hangs
+    // diagnosable without a second play session.
+    if (cfg.UnlockAllModes || cfg.DiagMissionWatch) {
+        if (HANDLE t = CreateThread(nullptr, 0, UnlockLoop, nullptr, 0, nullptr)) {
+            CloseHandle(t);
+        } else {
+            Log("could not start the background thread - unlock and watcher off");
+        }
     }
     return 0;
 }

@@ -13,6 +13,7 @@ struct Settings {
     int CallTransitionSetup = 1; // mirror the reference handler's fade call
     int ForceFadeIn      = 0;   // after opening, fade the screen back IN (test aid)
     int UnlockAllModes   = 1;   // show all of Bob's rows, not just Battle King
+    int DiagMissionWatch = 1;   // log the running macro + step; names any hang
 };
 const Settings& Get();   // reads HouseOfExtras.ini once, writes defaults if absent
 }

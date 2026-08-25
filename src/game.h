@@ -47,4 +47,10 @@ bool UnlockExtraModes();
 // the log and returns false if the layout could not be inspected at all.
 bool LogLayoutResources(const char* when, void* layout);
 
+// Samples the running mission macro (class, macro id, current and next step).
+// Logs only when something changes, so a whole play session costs a handful of
+// lines but a mode that parks forever names the exact class and step it stuck
+// on - including modes our patch never touches.
+void PollMissionState();
+
 }  // namespace game

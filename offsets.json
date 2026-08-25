@@ -120,7 +120,10 @@
     "LAYOUT_RES_STRIDE": "0x70",
     "LAYOUT_RES_COUNT_FIELD": "0x18",
     "G_LAYOUT_STATE_EXPECT": "0x19809E0",
-    "LAYOUT_SLOT_COUNT": 40
+    "LAYOUT_SLOT_COUNT": 40,
+    "MISSIONMGR_MACRO_FIELD": "0x58",
+    "MISSIONMGR_STATE_FIELD": "0x30",
+    "MACRO_ID_FIELD": "0x84"
   },
   "patterns": {
     "SET_RESULT_VARIANT": {
@@ -227,6 +230,19 @@
           "at": "0x3C",
           "len": 7,
           "expect_rva": "0x1980D18"
+        }
+      }
+    },
+    "MISSION_TICK": {
+      "comment": "sub_B6AD7D - the mission manager's tick. It calls the macro factory and stores the result in its own +0x58, then reads it back through the global we lift here. That gives us the CURRENT mission macro whatever it is, so the watcher can report a mode that hangs even when it is a class we never patch and our own handler never runs.",
+      "pattern": "48 8B 4B 50 48 85 C9 0F 84 ? ? ? ? 48 39",
+      "expect_rva": "0xB6AD7D",
+      "calls": {},
+      "riprefs": {
+        "G_MISSION_MGR": {
+          "at": "0x2C1",
+          "len": 7,
+          "expect_rva": "0x1A195E0"
         }
       }
     }

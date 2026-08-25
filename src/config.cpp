@@ -92,7 +92,13 @@ void WriteDefaults(const char* p) {
         ";  so they can never appear. This grants them and sets those flags via\n"
         ";  the game's own setter. It writes to your save.\n"
         ";  0 = leave the menu exactly as the PC build ships it.\n"
-        "UnlockAllModes=1\n", f);
+        "UnlockAllModes=1\n"
+        "\n;  1 = log which mission macro is running and what step it is on.\n"
+        ";  Cheap (sampled every 2 seconds, capped at 300 lines) and it works for\n"
+        ";  every mode, including ones this mod does not patch. If any mode ever\n"
+        ";  hangs, the log names the exact class and step it parked on instead of\n"
+        ";  leaving you with a black screen and nothing to go on.\n"
+        "DiagMissionWatch=1\n", f);
     fclose(f);
 }
 
@@ -118,6 +124,7 @@ Settings Load() {
         GetPrivateProfileIntA("Results", "CallTransitionSetup", s.CallTransitionSetup, p);
     s.ForceFadeIn      = GetPrivateProfileIntA("Results", "ForceFadeIn",      s.ForceFadeIn,      p);
     s.UnlockAllModes   = GetPrivateProfileIntA("Modes",   "UnlockAllModes",   s.UnlockAllModes,   p);
+    s.DiagMissionWatch = GetPrivateProfileIntA("Modes",   "DiagMissionWatch", s.DiagMissionWatch, p);
 
     // An unvalidated id indexes the screen-slot array (mainMgr + 0x1E8 + id*8).
     // slot(311) lands exactly on mainMgr+0xBA0, so 310 is the hard ceiling.

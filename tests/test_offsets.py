@@ -276,6 +276,74 @@ def test_rtti_slots_resolve(img, offsets):
             )
 
 
+def _all_mission_macro_classes(img):
+    """Decorated RTTI names, which is what _find_vtable expects."""
+    return sorted({m.group(0).decode()
+                   for m in re.finditer(rb"\.\?AVCMissionMacro[A-Za-z0-9_]*@@", img)})
+
+
+def test_only_colosseum_extra_has_gutted_step_handlers(img, offsets):
+    """The scope claim the whole mod rests on.
+
+    A macro's vtable has 96 slots; the step dispatcher has a 64-entry jump
+    table, so slots 18..81 are the step handlers (slot 62 == step 0x2C pins the
+    +18 offset). Most `ret 0` entries are shared base-class defaults - steps a
+    given macro simply does not use - so `ret 0` alone proves nothing. The
+    signature of code Sega deleted is a `ret 0` handler at an address used by
+    exactly ONE class, sitting beside its still-real siblings.
+
+    Sweeping every CMissionMacro class must therefore find exactly two: the
+    pair we patch. If a future build guts another one, some other mode can hang
+    the same way House of Extras did, and this fails loudly."""
+    STEP_LO, STEP_HI = 18, 81
+    classes = _all_mission_macro_classes(img)
+    assert len(classes) > 50, f"only found {len(classes)} macro classes - RTTI scan broke"
+
+    per_class, users, skipped = {}, {}, []
+    for name in classes:
+        try:
+            vt = _find_vtable(img, name)
+        except AssertionError as exc:
+            # Never silently: a swallowed lookup would empty the sweep and make
+            # this test claim "nothing else is gutted" without having looked.
+            skipped.append(f"{name}: {exc}")
+            continue
+        stubs = {}
+        for i in range(STEP_LO, STEP_HI + 1):
+            rva = struct.unpack_from("<Q", img, vt + i * 8)[0] - DUMP_BASE
+            if not (TEXT_LO <= rva < TEXT_HI):
+                break
+            f = _thunk(img, rva)
+            if img[f:f + 3] == b"\xc2\x00\x00":
+                stubs[i] = f
+        per_class[name] = stubs
+        for a in set(stubs.values()):
+            users[a] = users.get(a, 0) + 1
+
+    gutted = {
+        name: {i: a for i, a in stubs.items() if users[a] == 1}
+        for name, stubs in per_class.items()
+    }
+    gutted = {k: v for k, v in gutted.items() if v}
+
+    assert len(per_class) >= len(classes) - 2, (
+        f"resolved only {len(per_class)}/{len(classes)} vtables, so the sweep is "
+        f"not conclusive. Skipped: {skipped[:5]}"
+    )
+
+    patched = offsets["rtti"]["COLOSSEUM_EXTRA"]
+    expected_name = patched["type_name"]          # decorated, as _find_vtable wants
+    expected_slots = {int(s["slot"]) for s in patched["slots"].values()}
+
+    assert set(gutted) == {expected_name}, (
+        f"gutted step handlers outside the class we patch: "
+        f"{ {k: [hex(i) for i in v] for k, v in gutted.items()} }"
+    )
+    assert set(gutted[expected_name]) == expected_slots, (
+        f"gutted slots {sorted(gutted[expected_name])} != patched {sorted(expected_slots)}"
+    )
+
+
 def test_patch_sites_are_stubs_with_room(img, offsets):
     for name, s in offsets["rtti"]["COLOSSEUM_EXTRA"]["slots"].items():
         rva = int(s["expect_rva"], 16)

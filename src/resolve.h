@@ -38,6 +38,13 @@ struct Resolved {
     uintptr_t GDlcMask     = 0;   // the 64-byte ownership bitset IsDlcOwned reads
     bool      unlockOk     = false;
 
+    // The mission manager global, via the MISSION_TICK anchor. Lets the watcher
+    // report the running macro and its step for ANY mode, including classes we
+    // never patch - so a mode that hangs is diagnosable from a single session
+    // even though our own handler never runs for it.
+    uintptr_t GMissionMgr  = 0;
+    bool      missionDiagOk = false;
+
     // Layout introspection, via the NETRANK_BIND anchor. Diagnostics only - it
     // answers why a layout can be live, animating and draw-gated open yet put
     // no pixels on screen. Optional; `ok` does not depend on it.

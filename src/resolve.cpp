@@ -287,6 +287,16 @@ Resolved Build() {
                  "shows will appear in Bob's menu");
     }
 
+    // --- mission manager (diagnostics only, never fatal) ---
+    if (uintptr_t tick = FindPattern(off::ANCHOR_MISSION_TICK_PATTERN)) {
+        Check("MissionTick", tick, off::EXPECT_MISSION_TICK);
+        r.GMissionMgr = ReadRipRef(tick + off::RIPAT_G_MISSION_MGR,
+                                   off::RIPLEN_G_MISSION_MGR);
+        Check("GMissionMgr", r.GMissionMgr, off::EXPECT_G_MISSION_MGR);
+        r.missionDiagOk = InImage(r.GMissionMgr);
+    }
+    if (!r.missionDiagOk) hoe::Log("  mission watcher unavailable (non-fatal)");
+
     // --- layout introspection (diagnostics only, never fatal) ---
     // LoadLayout builds only "<name>.csb"; a layout's textures come from a
     // separate archive loaded by TEXPAR_LOAD into its own slot table. That

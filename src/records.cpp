@@ -1,5 +1,6 @@
 #include "records.h"
 #include "log.h"
+#include "paths.h"
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
@@ -21,20 +22,17 @@ constexpr int kMaxPlausibleScore = 9999;
 
 bool Plausible(int score) { return score > 0 && score <= kMaxPlausibleScore; }
 
-const char* Path() {
-    static char path[MAX_PATH] = {};
-    if (!path[0]) {
-        GetModuleFileNameA(nullptr, path, MAX_PATH);
-        char* slash = strrchr(path, '\\');
-        if (slash) strcpy(slash + 1, "HouseOfExtras.records");
-    }
-    return path;
-}
+// Was a hand-rolled GetModuleFileName + unbounded strcpy, which overruns the
+// buffer when the install directory is deep enough that the leaf name no
+// longer fits. config.cpp guarded the same operation; this copy did not.
+const char* Path() { return hoe::ExeRelative("HouseOfExtras.records"); }
 
 void Load() {
     if (gLoaded) return;
     gLoaded = true;
-    FILE* f = fopen(Path(), "r");
+    const char* path = Path();
+    if (!path) { hoe::Log("records: could not build a path; best scores off"); return; }
+    FILE* f = fopen(path, "r");
     if (!f) return;
     char line[128];
     while (fgets(line, sizeof(line), f) && gCount < 32) {
@@ -51,7 +49,9 @@ void Load() {
 }
 
 void Save() {
-    FILE* f = fopen(Path(), "w");
+    const char* path = Path();
+    if (!path) return;
+    FILE* f = fopen(path, "w");
     if (!f) return;
     fputs("# House of Extras best scores (modeId=score)\n", f);
     for (int i = 0; i < gCount; ++i) fprintf(f, "%d=%d\n", g[i].mode, g[i].score);

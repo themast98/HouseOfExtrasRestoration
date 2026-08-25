@@ -18,6 +18,7 @@ LayoutIsLoadingFn LayoutIsLoading = nullptr;
 LayoutPageReadyFn LayoutPageReady = nullptr;
 static unsigned char* s_layoutRes    = nullptr;
 static void**         s_layoutTexPar = nullptr;
+static void**         s_pMissionMgr  = nullptr;
 void**            pMainMgr        = nullptr;
 void**            pFlagMgr        = nullptr;
 float*            pKFloat         = nullptr;
@@ -41,6 +42,7 @@ bool Bind() {
         pDlcMask     = (uint32_t*)     (b + r.GDlcMask);
         if (r.IsDlcOwned) IsDlcOwned = (IsDlcOwnedFn)(b + r.IsDlcOwned);
     }
+    if (r.missionDiagOk) s_pMissionMgr = (void**)(b + r.GMissionMgr);
     if (r.layoutDiagOk) {
         LayoutIsLoading = (LayoutIsLoadingFn)(b + r.LayoutIsLoading);
         LayoutPageReady = (LayoutPageReadyFn)(b + r.LayoutPageReady);
@@ -155,6 +157,89 @@ bool LogLayoutResources(const char* when, void* layout) {
                  "draw-gated layout rendering nothing.", when);
     }
     return true;
+}
+
+// MSVC stores a Complete Object Locator pointer immediately before every
+// polymorphic vftable, so the class name is a couple of pointer hops away - no
+// scanning. Worth it: it turns "vft=+0x1384968" in the log into a name we can
+// act on straight away.
+const char* MacroClassName(const void* obj) {
+    const uintptr_t base = hoe::Base();
+    const uintptr_t size = hoe::ImageSize();
+    auto inImage = [&](uintptr_t rva) { return rva > 0 && rva + 32 < size; };
+    if (!obj) return "?";
+
+    const uintptr_t vft = *(const uintptr_t*)obj;
+    if (vft < base || vft - base >= size) return "?";
+    const uintptr_t col = *(const uintptr_t*)(vft - 8);
+    if (col < base || col - base >= size) return "?";
+
+    const uint32_t tdRva = *(const uint32_t*)(col + 12);
+    if (!inImage(tdRva)) return "?";
+    auto name = (const char*)(base + tdRva + 16);
+    // Decorated names always start ".?AV"; anything else means we mis-stepped.
+    return (name[0] == '.' && name[1] == '?') ? name : "?";
+}
+
+// A macro whose handler never queues a next step parks forever: `cur` stops
+// changing and `next` sits at -1. That is precisely the House of Extras black
+// screen, and printing it for whatever macro is running means any mode which
+// hangs identifies itself, without needing a patch in that class first.
+void PollMissionState() {
+    if (!s_pMissionMgr) return;
+    auto mgr = (unsigned char*)*s_pMissionMgr;
+    if (!mgr) return;
+    auto macro = *(unsigned char**)(mgr + off::C_MISSIONMGR_MACRO_FIELD);
+
+    static void* s_lastMacro = nullptr;
+    static int   s_lastCur = -2, s_lastNext = -2;
+    static int   s_stuckTicks = 0;
+
+    if (!macro) {
+        if (s_lastMacro) {
+            hoe::Log("mission: macro ended");
+            s_lastMacro = nullptr; s_lastCur = s_lastNext = -2; s_stuckTicks = 0;
+        }
+        return;
+    }
+
+    const int id   = *(int*)(macro + off::C_MACRO_ID_FIELD);
+    const int cur  = *(int*)(macro + off::C_CUR_STEP_FIELD);
+    const int next = *(int*)(macro + off::C_NEXT_STEP_FIELD);
+    const uintptr_t vft = *(uintptr_t*)macro - hoe::Base();
+
+    if (macro != s_lastMacro) {
+        hoe::Log("mission: macro %p id=0x%X %s (vft +0x%llX)", macro, id,
+                 MacroClassName(macro), (unsigned long long)vft);
+        s_lastMacro = macro; s_lastCur = s_lastNext = -2; s_stuckTicks = 0;
+    }
+    if (cur != s_lastCur || next != s_lastNext) {
+        // Capped so a long session cannot balloon the log; the STUCK check
+        // below keeps working after the cap, which is the part that matters.
+        static int s_lines = 0;
+        const int kMaxLines = 300;
+        if (s_lines < kMaxLines) {
+            hoe::Log("mission: step 0x%X -> next %d (id=0x%X)", cur, next, id);
+        } else if (s_lines == kMaxLines) {
+            hoe::Log("mission: step logging capped at %d lines; still watching "
+                     "for a stuck step", kMaxLines);
+        }
+        ++s_lines;
+        s_lastCur = cur; s_lastNext = next; s_stuckTicks = 0;
+        return;
+    }
+
+    // Parked: same step, nothing queued. This is the black-screen signature,
+    // but it is NOT proof on its own - plenty of macros idle this way while
+    // waiting on input (the title screen sits at step 0x3B with next -1). So
+    // wait a good while and word it as an observation, not a verdict.
+    const int kParkedTicks = 15;                 // ~30s at the 2s heartbeat
+    if (next == -1 && ++s_stuckTicks == kParkedTicks) {
+        hoe::Log("mission: parked ~%ds at step 0x%X with nothing queued - %s "
+                 "(id=0x%X). Normal while a macro waits on input; if the screen "
+                 "is black this is the signature of a missing step handler.",
+                 kParkedTicks * 2, cur, MacroClassName(macro), id);
+    }
 }
 
 }  // namespace game
