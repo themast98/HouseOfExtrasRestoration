@@ -199,6 +199,54 @@ def test_unlock_aliases_are_consecutive_and_match_the_bridge(img, offsets):
         assert b"\xba" + struct.pack("<I", alias) in body, f"alias 0x{alias:X} absent"
 
 
+def test_texpar_table_is_an_absolute_displacement(img, offsets):
+    """The layout texture-archive table is reached as [reg + idx*8 + disp32]
+    with a zeroed base, not RIP-relative - so the displacement IS the RVA and
+    must not have the instruction length added. Getting that wrong silently
+    reads the wrong table, so pin both the encoding and the address."""
+    c = offsets["constants"]
+    base = int(offsets["patterns"]["TEXPAR_LOAD"]["expect_rva"], 16)
+    at = base + int(c["TEXPAR_TABLE_DISP_AT"], 16)
+    # 49 8b 8c f6 <disp32>  =  mov rcx, [r14 + rsi*8 + disp32]
+    assert img[at:at + 4] == b"\x49\x8b\x8c\xf6", (
+        f"unexpected encoding at 0x{at:X}: {img[at:at + 4].hex(' ')}"
+    )
+    disp = struct.unpack_from("<I", img, at + 4)[0]
+    assert disp == int(c["G_LAYOUT_TEXPAR_EXPECT"], 16), f"got 0x{disp:X}"
+
+
+def test_layout_slot_count_fits_between_the_tables(offsets):
+    """Three parallel per-slot tables sit back to back:
+        0x19809E0 dword/slot   0x1980A80 qword/slot (textures)   0x1980D18 (resources)
+    The dword table ends exactly where the texture table starts, which is what
+    pins the slot count. The runtime bound must not exceed what any gap allows,
+    or the diagnostic reads past a table into unrelated globals."""
+    c = offsets["constants"]
+    state = int(c["G_LAYOUT_STATE_EXPECT"], 16)
+    texpar = int(c["G_LAYOUT_TEXPAR_EXPECT"], 16)
+    res = int(offsets["anchors"]["NETRANK_BIND"]["riprefs"]["G_LAYOUT_RES"]["expect_rva"], 16)
+    n = int(c["LAYOUT_SLOT_COUNT"])
+
+    assert state + n * 4 <= texpar, "slot count overruns the dword table"
+    assert texpar + n * 8 <= res, "slot count overruns the texture table"
+    # the dword table ending flush against the texture table is the evidence
+    assert state + n * 4 == texpar, "the dword table no longer ends at the texture table"
+
+
+def test_layout_load_never_touches_textures(img, offsets):
+    """The premise of the texture diagnostic: LoadLayout builds only '<name>.csb'
+    and never calls the texture-archive loader. If a rebuild merged the two,
+    the diagnostic's conclusion would be wrong and this should fail."""
+    lo = int(offsets["patterns"]["LAYOUT_LOAD"]["expect_rva"], 16)
+    tex = int(offsets["patterns"]["TEXPAR_LOAD"]["expect_rva"], 16)
+    body = img[lo:lo + 0x400]
+    for i in range(len(body) - 5):
+        if body[i] != 0xE8:
+            continue
+        dest = _thunk(img, lo + i + 5 + struct.unpack_from("<i", body, i + 1)[0])
+        assert dest != tex, f"LoadLayout calls the texture loader at +0x{i:X}"
+
+
 def test_anchor_calls_resolve(img, offsets):
     base = int(offsets["anchor"]["expect_rva"], 16)
     for name, c in offsets["anchor"]["calls"].items():

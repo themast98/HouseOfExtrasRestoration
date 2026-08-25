@@ -45,6 +45,17 @@ constexpr char ANCHOR_IS_DLC_OWNED_PATTERN[] = "8B C2 48 8D 0D ? ? ? ? 48 C1 E8 
 constexpr uintptr_t RIPAT_G_DLC_MASK = 0x02;
 constexpr uintptr_t RIPLEN_G_DLC_MASK = 7;
 constexpr uintptr_t EXPECT_G_DLC_MASK = 0x1A21C50;
+constexpr char ANCHOR_NETRANK_BIND_PATTERN[] = "48 89 5C 24 10 57 48 83 EC 20 48 8B D9 33 FF 48 8B 09";
+constexpr uintptr_t EXPECT_NETRANK_BIND = 0x85E330;
+constexpr uintptr_t CALLAT_LAYOUT_IS_LOADING = 0x12;
+constexpr uintptr_t EXPECT_LAYOUT_IS_LOADING = 0x4843E0;
+constexpr uintptr_t CALLAT_LAYOUT_PAGE_READY = 0x24;
+constexpr uintptr_t EXPECT_LAYOUT_PAGE_READY = 0x484510;
+constexpr uintptr_t CALLAT_LAYOUT_GET_PANE = 0x57;
+constexpr uintptr_t EXPECT_LAYOUT_GET_PANE = 0x484220;
+constexpr uintptr_t RIPAT_G_LAYOUT_RES = 0x3C;
+constexpr uintptr_t RIPLEN_G_LAYOUT_RES = 7;
+constexpr uintptr_t EXPECT_G_LAYOUT_RES = 0x1980D18;
 
 // ---- standalone byte patterns ----
 constexpr char PATTERN_SET_RESULT_VARIANT[] = "48 83 EC 28 89 91 B8 01 00 00 44 89 81 BC 01 00 00";
@@ -61,12 +72,12 @@ constexpr char PATTERN_NETRANK_CTOR[] = "33 C0 33 D2 48 89 11 48 89 41";
 constexpr uintptr_t EXPECT_NETRANK_CTOR = 0x85DE90;
 constexpr char PATTERN_NETRANK_LOADLAYOUT[] = "40 53 48 83 EC 30 48 C7 44 24 20 FE FF FF FF 48 8B D9 B9 28 01 00 00 E8 ? ? ? ? 48 89 44 24 40 48 85 C0 74 13";
 constexpr uintptr_t EXPECT_NETRANK_LOADLAYOUT = 0x85E110;
-constexpr char PATTERN_NETRANK_BIND[] = "48 89 5C 24 10 57 48 83 EC 20 48 8B D9 33 FF 48 8B 09";
-constexpr uintptr_t EXPECT_NETRANK_BIND = 0x85E330;
 constexpr char PATTERN_NETRANK_SHOW[] = "48 89 5C 24 08 57 48 83 EC 20 48 63 DA 48 8B F9 45 85 C0 75 2A 8B D3 E8 ? ? ? ? 85 C0 74 48 48 8B 4C DF 08";
 constexpr uintptr_t EXPECT_NETRANK_SHOW = 0x85E020;
 constexpr char PATTERN_NETRANK_DRAW[] = "40 53 48 83 EC 20 33 D2 48 8B D9 E8 ? ? ? ? 85 C0 74 38";
 constexpr uintptr_t EXPECT_NETRANK_DRAW = 0x85DEC0;
+constexpr char PATTERN_TEXPAR_LOAD[] = "40 53 55 56 57 41 56 48 81 EC 60 01 00 00 48 C7 44 24 30 FE FF FF FF 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 50 01 00 00 49 8B E8 48 63";
+constexpr uintptr_t EXPECT_TEXPAR_LOAD = 0x482780;
 
 // ---- RTTI: type descriptor -> COL -> vftable -> slot ----
 constexpr char TYPENAME_COLOSSEUM_EXTRA[] = ".?AVCMissionMacroColosseumExtra@@";
@@ -113,5 +124,12 @@ constexpr uintptr_t C_FLAG_ALIAS_FASTEST_KILLER = 0x64A;
 constexpr uintptr_t C_DLC_BIT_SURVIVAL_TAG_SP = 0x17;
 constexpr uintptr_t C_DLC_BIT_SPEED_KING = 0x18;
 constexpr uintptr_t C_DLC_BIT_FASTEST_KILLER = 0x19;
+constexpr uintptr_t C_TEXPAR_TABLE_DISP_AT = 0x55;
+constexpr uintptr_t C_G_LAYOUT_TEXPAR_EXPECT = 0x1980A80;
+constexpr uintptr_t C_LAYOUT_RES_INDEX_FIELD = 0x8;
+constexpr uintptr_t C_LAYOUT_RES_STRIDE = 0x70;
+constexpr uintptr_t C_LAYOUT_RES_COUNT_FIELD = 0x18;
+constexpr uintptr_t C_G_LAYOUT_STATE_EXPECT = 0x19809E0;
+constexpr uintptr_t C_LAYOUT_SLOT_COUNT = 40;
 
 }  // namespace off

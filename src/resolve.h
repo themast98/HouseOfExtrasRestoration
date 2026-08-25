@@ -38,6 +38,16 @@ struct Resolved {
     uintptr_t GDlcMask     = 0;   // the 64-byte ownership bitset IsDlcOwned reads
     bool      unlockOk     = false;
 
+    // Layout introspection, via the NETRANK_BIND anchor. Diagnostics only - it
+    // answers why a layout can be live, animating and draw-gated open yet put
+    // no pixels on screen. Optional; `ok` does not depend on it.
+    uintptr_t LayoutIsLoading = 0;   // sub_4843E0(layout) -> nonzero while loading
+    uintptr_t LayoutPageReady = 0;   // sub_484510(layout, page) -> nonzero when ready
+    uintptr_t LayoutGetPane   = 0;   // sub_484220(layout, index) -> pane
+    uintptr_t GLayoutRes      = 0;   // per-layout resource table, stride 0x70
+    uintptr_t GLayoutTexPar   = 0;   // per-layout texture-archive handle table
+    bool      layoutDiagOk    = false;
+
     // pattern: sub_3A46D0(screen, variant, holdFrames) - the result-variant
     // setter the deleted src/ranking code called. Without it screen 220
     // constructs but its draw gate at +0x1C0 stays 0 and it renders nothing.

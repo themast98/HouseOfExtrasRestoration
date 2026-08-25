@@ -113,7 +113,14 @@
     "FLAG_ALIAS_FASTEST_KILLER": "0x64A",
     "DLC_BIT_SURVIVAL_TAG_SP": "0x17",
     "DLC_BIT_SPEED_KING": "0x18",
-    "DLC_BIT_FASTEST_KILLER": "0x19"
+    "DLC_BIT_FASTEST_KILLER": "0x19",
+    "TEXPAR_TABLE_DISP_AT": "0x55",
+    "G_LAYOUT_TEXPAR_EXPECT": "0x1980A80",
+    "LAYOUT_RES_INDEX_FIELD": "0x8",
+    "LAYOUT_RES_STRIDE": "0x70",
+    "LAYOUT_RES_COUNT_FIELD": "0x18",
+    "G_LAYOUT_STATE_EXPECT": "0x19809E0",
+    "LAYOUT_SLOT_COUNT": 40
   },
   "patterns": {
     "SET_RESULT_VARIANT": {
@@ -151,11 +158,6 @@
       "pattern": "40 53 48 83 EC 30 48 C7 44 24 20 FE FF FF FF 48 8B D9 B9 28 01 00 00 E8 ? ? ? ? 48 89 44 24 40 48 85 C0 74 13",
       "expect_rva": "0x85E110"
     },
-    "NETRANK_BIND": {
-      "comment": "binds panes once the csb has loaded",
-      "pattern": "48 89 5C 24 10 57 48 83 EC 20 48 8B D9 33 FF 48 8B 09",
-      "expect_rva": "0x85E330"
-    },
     "NETRANK_SHOW": {
       "comment": "Show(group, on)",
       "pattern": "48 89 5C 24 08 57 48 83 EC 20 48 63 DA 48 8B F9 45 85 C0 75 2A 8B D3 E8 ? ? ? ? 85 C0 74 48 48 8B 4C DF 08",
@@ -165,6 +167,11 @@
       "comment": "renders the stored int as %d into the panes",
       "pattern": "40 53 48 83 EC 20 33 D2 48 8B D9 E8 ? ? ? ? 85 C0 74 38",
       "expect_rva": "0x85DEC0"
+    },
+    "TEXPAR_LOAD": {
+      "comment": "sub_482780(name, slot, arg) - the ONLY caller-visible loader of a layout's texture archive ('<prefix><name>.par'), stashing the handle in a global slot table. LoadLayout never touches textures, so a layout can be live, animating and draw-gated open while being entirely invisible. We read the table's address out of the absolute displacement at +0x55 (not RIP-relative).",
+      "pattern": "40 53 55 56 57 41 56 48 81 EC 60 01 00 00 48 C7 44 24 30 FE FF FF FF 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 50 01 00 00 49 8B E8 48 63",
+      "expect_rva": "0x482780"
     }
   },
   "anchors": {
@@ -194,6 +201,32 @@
           "at": "0x02",
           "len": 7,
           "expect_rva": "0x1A21C50"
+        }
+      }
+    },
+    "NETRANK_BIND": {
+      "comment": "sub_85E330 - the surviving network-ranking widget's pane binder. It is the cleanest caller of the generic layout-state helpers, so we anchor on it to reach them: is-loading, is-page-ready, and get-pane-by-index. Also yields the per-layout resource table (stride 0x70; element count at +0x18).",
+      "pattern": "48 89 5C 24 10 57 48 83 EC 20 48 8B D9 33 FF 48 8B 09",
+      "expect_rva": "0x85E330",
+      "calls": {
+        "LAYOUT_IS_LOADING": {
+          "at": "0x12",
+          "expect_rva": "0x4843E0"
+        },
+        "LAYOUT_PAGE_READY": {
+          "at": "0x24",
+          "expect_rva": "0x484510"
+        },
+        "LAYOUT_GET_PANE": {
+          "at": "0x57",
+          "expect_rva": "0x484220"
+        }
+      },
+      "riprefs": {
+        "G_LAYOUT_RES": {
+          "at": "0x3C",
+          "len": 7,
+          "expect_rva": "0x1980D18"
         }
       }
     }

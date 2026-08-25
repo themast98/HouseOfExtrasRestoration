@@ -115,6 +115,7 @@ void LogElementState(const char* when, int variant) {
     hoe::Log("  elem %s: layout=%p page%d=%p elem=%p flags[+2C]=0x%08X armed=%d suppress[+BC]=%d",
              when, layout, variant, page, elem, flags, (flags & 1) ? 1 : 0,
              *(int*)(elem + off::C_ELEM_SUPPRESS_FIELD));
+    game::LogLayoutResources(when, layout);
 }
 
 uint64_t ScreenSlot(void* mgr, int screenId) {

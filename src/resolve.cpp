@@ -41,6 +41,17 @@ uintptr_t ReadCall(uintptr_t rva) {
     return Thunk(rva + 5 + rel);
 }
 
+// Raw disp32 read. Some tables are reached through an absolute displacement
+// with a zeroed base register rather than a RIP-relative operand, so the
+// displacement IS the RVA and must not have the instruction length added.
+uint32_t ReadU32At(uintptr_t rva) {
+    const unsigned char* img = Img();
+    if (!InImage(rva)) return 0;
+    uint32_t v;
+    memcpy(&v, img + rva, 4);
+    return v;
+}
+
 // RIP-relative operand whose disp32 occupies the last 4 bytes of the instruction.
 uintptr_t ReadRipRef(uintptr_t rva, uintptr_t len) {
     const unsigned char* img = Img();
@@ -275,6 +286,34 @@ Resolved Build() {
         hoe::Log("  mode unlock unavailable - only the rows the game already "
                  "shows will appear in Bob's menu");
     }
+
+    // --- layout introspection (diagnostics only, never fatal) ---
+    // LoadLayout builds only "<name>.csb"; a layout's textures come from a
+    // separate archive loaded by TEXPAR_LOAD into its own slot table. That
+    // split is the leading explanation for a screen that opens, registers,
+    // animates and holds while rendering nothing at all, so we report it.
+    if (uintptr_t bind = FindPattern(off::ANCHOR_NETRANK_BIND_PATTERN)) {
+        r.LayoutIsLoading = ReadCall(bind + off::CALLAT_LAYOUT_IS_LOADING);
+        r.LayoutPageReady = ReadCall(bind + off::CALLAT_LAYOUT_PAGE_READY);
+        r.LayoutGetPane   = ReadCall(bind + off::CALLAT_LAYOUT_GET_PANE);
+        r.GLayoutRes      = ReadRipRef(bind + off::RIPAT_G_LAYOUT_RES,
+                                       off::RIPLEN_G_LAYOUT_RES);
+        Check("LayoutIsLoading", r.LayoutIsLoading, off::EXPECT_LAYOUT_IS_LOADING);
+        Check("LayoutPageReady", r.LayoutPageReady, off::EXPECT_LAYOUT_PAGE_READY);
+        Check("LayoutGetPane",   r.LayoutGetPane,   off::EXPECT_LAYOUT_GET_PANE);
+        Check("GLayoutRes",      r.GLayoutRes,      off::EXPECT_G_LAYOUT_RES);
+
+        if (uintptr_t tex = FindPattern(off::PATTERN_TEXPAR_LOAD)) {
+            Check("TexParLoad", tex, off::EXPECT_TEXPAR_LOAD);
+            r.GLayoutTexPar = ReadU32At(tex + off::C_TEXPAR_TABLE_DISP_AT + 4);
+            Check("GLayoutTexPar", r.GLayoutTexPar, off::C_G_LAYOUT_TEXPAR_EXPECT);
+        }
+
+        r.layoutDiagOk = InImage(r.LayoutIsLoading) && InImage(r.LayoutPageReady) &&
+                         InImage(r.LayoutGetPane)  && InImage(r.GLayoutRes) &&
+                         InImage(r.GLayoutTexPar);
+    }
+    if (!r.layoutDiagOk) hoe::Log("  layout diagnostics unavailable (non-fatal)");
 
     r.ok = true;
     hoe::Log("resolve OK");

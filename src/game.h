@@ -14,6 +14,8 @@ using SetResultVariantFn = void(*)(void* screen, int variant, int holdFrames);
 // (332, 30) keeps us correct even if a rebuild renumbers flag groups.
 using SetFlagAliasFn     = void(*)(void* flagMgr, int alias, int value);
 using IsDlcOwnedFn       = bool(*)(void* ignored, int bit);
+using LayoutIsLoadingFn  = int(*)(void* layout);
+using LayoutPageReadyFn  = int(*)(void* layout, int page);
 
 extern TransitionSetupFn TransitionSetup;
 extern CommitFlagsFn     CommitFlags;
@@ -38,5 +40,11 @@ int  ReadKillCount();                     // -1 when the field cannot be trusted
 // save load replacing the flag bank underneath us.
 // Returns true once the save flags have actually been written.
 bool UnlockExtraModes();
+
+// Reports why a layout may be invisible: whether it is still loading, whether
+// its page is ready, how many elements the engine registered for it, and -
+// the interesting one - whether its texture archive was ever loaded. Writes to
+// the log and returns false if the layout could not be inspected at all.
+bool LogLayoutResources(const char* when, void* layout);
 
 }  // namespace game

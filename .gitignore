@@ -5,3 +5,4 @@ refs/*.bin
 *.records
 __pycache__/
 *.pyc
+refs/*.sllz
