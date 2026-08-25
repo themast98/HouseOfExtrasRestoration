@@ -43,6 +43,30 @@ static bool InstallPatches() {
     return true;
 }
 
+// The flag manager does not exist yet at startup and is replaced wholesale
+// every time a save is loaded, so a one-shot unlock would be silently undone.
+// Re-applying on a slow heartbeat is three idempotent flag writes every two
+// seconds - invisible next to a frame of gameplay - and it means the unlock
+// survives loading a save, starting a new game, or the game's own DLC bridge
+// running at any point afterwards.
+static DWORD WINAPI UnlockLoop(LPVOID) {
+    using namespace hoe;
+    bool announced = false;
+    for (;;) {
+        if (game::UnlockExtraModes() && !announced) {
+            announced = true;
+            if (game::IsDlcOwned) {
+                Log("mode unlock applied - entitlements now owned: 0x17=%d 0x18=%d 0x19=%d",
+                    (int)game::IsDlcOwned(nullptr, (int)off::C_DLC_BIT_SURVIVAL_TAG_SP),
+                    (int)game::IsDlcOwned(nullptr, (int)off::C_DLC_BIT_SPEED_KING),
+                    (int)game::IsDlcOwned(nullptr, (int)off::C_DLC_BIT_FASTEST_KILLER));
+            }
+            Log("all House of Extras modes unlocked - Bob's menu should list every row");
+        }
+        Sleep(2000);
+    }
+}
+
 static DWORD WINAPI Init(LPVOID) {
     using namespace hoe;
     LogInit();
@@ -61,6 +85,16 @@ static DWORD WINAPI Init(LPVOID) {
 
     Log(InstallPatches() ? "patches installed - House of Extras will now finish properly"
                          : "PATCH INSTALL FAILED - game left untouched");
+
+    if (!cfg.UnlockAllModes) {
+        Log("UnlockAllModes=0 - leaving Bob's menu as the PC build ships it");
+    } else if (!resolve::Get().unlockOk) {
+        Log("UnlockAllModes=1 but the flag setter did not resolve - menu unchanged");
+    } else if (HANDLE t = CreateThread(nullptr, 0, UnlockLoop, nullptr, 0, nullptr)) {
+        CloseHandle(t);
+    } else {
+        Log("could not start the unlock thread - menu unchanged");
+    }
     return 0;
 }
 

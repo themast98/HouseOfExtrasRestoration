@@ -84,7 +84,15 @@ void WriteDefaults(const char* p) {
         ";  and skipping our own fade call does not undo it. This actively clears the\n"
         ";  overlay, so if the results panel then appears it was merely underneath it.\n"
         ";  Diagnostic aid - the black background is correct in the original game.\n"
-        "ForceFadeIn=0\n", f);
+        "ForceFadeIn=0\n"
+        "\n[Modes]\n"
+        ";  1 = show all of Bob's House of Extras rows, not just Battle King.\n"
+        ";  The other rows are gated on save flags the game sets from DLC\n"
+        ";  entitlements, and the PC build never grants entitlements 0x17-0x19,\n"
+        ";  so they can never appear. This grants them and sets those flags via\n"
+        ";  the game's own setter. It writes to your save.\n"
+        ";  0 = leave the menu exactly as the PC build ships it.\n"
+        "UnlockAllModes=1\n", f);
     fclose(f);
 }
 
@@ -109,6 +117,7 @@ Settings Load() {
     s.CallTransitionSetup =
         GetPrivateProfileIntA("Results", "CallTransitionSetup", s.CallTransitionSetup, p);
     s.ForceFadeIn      = GetPrivateProfileIntA("Results", "ForceFadeIn",      s.ForceFadeIn,      p);
+    s.UnlockAllModes   = GetPrivateProfileIntA("Modes",   "UnlockAllModes",   s.UnlockAllModes,   p);
 
     // An unvalidated id indexes the screen-slot array (mainMgr + 0x1E8 + id*8).
     // slot(311) lands exactly on mainMgr+0xBA0, so 310 is the hard ceiling.
@@ -133,9 +142,9 @@ Settings Load() {
     }
 
     hoe::Log("config: Enabled=%d ShowResultScreen=%d ResultScreenId=%d ResultTimeoutSec=%d "
-             "TrackBestScore=%d DiagDumpFields=%d",
+             "TrackBestScore=%d DiagDumpFields=%d UnlockAllModes=%d",
              s.Enabled, s.ShowResultScreen, s.ResultScreenId, s.ResultTimeoutSec,
-             s.TrackBestScore, s.DiagDumpFields);
+             s.TrackBestScore, s.DiagDumpFields, s.UnlockAllModes);
     return s;
 }
 

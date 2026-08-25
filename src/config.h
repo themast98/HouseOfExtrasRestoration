@@ -12,6 +12,7 @@ struct Settings {
     int DiagScreenState  = 1;   // log the result screen's own state each second
     int CallTransitionSetup = 1; // mirror the reference handler's fade call
     int ForceFadeIn      = 0;   // after opening, fade the screen back IN (test aid)
+    int UnlockAllModes   = 1;   // show all of Bob's rows, not just Battle King
 };
 const Settings& Get();   // reads HouseOfExtras.ini once, writes defaults if absent
 }

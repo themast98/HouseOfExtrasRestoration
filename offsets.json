@@ -106,7 +106,14 @@
     "NETRANK_PANEL_SIZE": "0x28",
     "NETRANK_LAYOUT_SIZE": "0x128",
     "NETRANK_VALUE_FIELD": "0x20",
-    "HEAP_ID_UI": 10
+    "HEAP_ID_UI": 10,
+    "FLAGMGR_TABLE_FIELD": "0x990",
+    "FLAG_ALIAS_SURVIVAL_TAG_SP": "0x648",
+    "FLAG_ALIAS_SPEED_KING": "0x649",
+    "FLAG_ALIAS_FASTEST_KILLER": "0x64A",
+    "DLC_BIT_SURVIVAL_TAG_SP": "0x17",
+    "DLC_BIT_SPEED_KING": "0x18",
+    "DLC_BIT_FASTEST_KILLER": "0x19"
   },
   "patterns": {
     "SET_RESULT_VARIANT": {
@@ -158,6 +165,37 @@
       "comment": "renders the stored int as %d into the panes",
       "pattern": "40 53 48 83 EC 20 33 D2 48 8B D9 E8 ? ? ? ? 85 C0 74 38",
       "expect_rva": "0x85DEC0"
+    }
+  },
+  "anchors": {
+    "DLC_FLAG_BRIDGE": {
+      "comment": "sub_BCD251 - the surviving DLC->save-flag bridge (talk-script command 0x54). It calls IsDlcOwned(0x17..0x1A) and feeds each result to SetFlagByAlias with alias 0x648..0x64B. Those aliases are exactly the Extras unlock flags (group 332 bits 30..33), which is how we learned both the setter and the alias numbers. We anchor here because SetFlagByAlias has no unique prefix.",
+      "pattern": "BA 17 00 00 00 48 8D 0D ? ? ? ? E8 ? ? ? ? 48",
+      "expect_rva": "0xBCD251",
+      "calls": {
+        "IS_DLC_OWNED": {
+          "at": "0x0C",
+          "expect_rva": "0xCB5970"
+        },
+        "SET_FLAG_ALIAS": {
+          "at": "0x20",
+          "expect_rva": "0x28A7A0"
+        }
+      },
+      "riprefs": {}
+    },
+    "IS_DLC_OWNED": {
+      "comment": "sub_CB5970(ignored, bit) -> bool. Ignores its rcx argument and reads a fixed 64-byte ownership bitset, whose address we lift out of its own lea.",
+      "pattern": "8B C2 48 8D 0D ? ? ? ? 48 C1 E8 05 44",
+      "expect_rva": "0xCB5970",
+      "calls": {},
+      "riprefs": {
+        "G_DLC_MASK": {
+          "at": "0x02",
+          "len": 7,
+          "expect_rva": "0x1A21C50"
+        }
+      }
     }
   }
 }

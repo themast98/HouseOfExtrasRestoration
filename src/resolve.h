@@ -29,6 +29,15 @@ struct Resolved {
     // RTTI: CActionColosseumExtra vtable, used to type-check [mainMgr+0xBA0]
     uintptr_t ActionExtraVft  = 0;
 
+    // Via the DLC->save-flag bridge anchor (sub_BCD251). These unlock the six
+    // rows of Bob's menu that the PC build gates behind DLC entitlements it
+    // never grants. Optional: if they fail to resolve, `ok` still holds and the
+    // mode-completion fix installs anyway.
+    uintptr_t SetFlagAlias = 0;   // sub_28A7A0(flagMgr, alias, value)
+    uintptr_t IsDlcOwned   = 0;   // sub_CB5970(ignored, bit) -> bool
+    uintptr_t GDlcMask     = 0;   // the 64-byte ownership bitset IsDlcOwned reads
+    bool      unlockOk     = false;
+
     // pattern: sub_3A46D0(screen, variant, holdFrames) - the result-variant
     // setter the deleted src/ranking code called. Without it screen 220
     // constructs but its draw gate at +0x1C0 stays 0 and it renders nothing.

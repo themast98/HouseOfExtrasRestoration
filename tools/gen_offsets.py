@@ -54,6 +54,19 @@ for name, r in a["riprefs"].items():
     L += expect(name, r["expect_rva"])
 L.append("")
 
+L.append("// ---- secondary anchors: same idiom, different entry points ----")
+for aname, sec in meta.get("anchors", {}).items():
+    L.append(f'constexpr char ANCHOR_{aname}_PATTERN[] = "{sec["pattern"]}";')
+    L += expect(aname, sec["expect_rva"])
+    for name, c in sec.get("calls", {}).items():
+        L.append(f'constexpr uintptr_t CALLAT_{name} = {c["at"]};')
+        L += expect(name, c["expect_rva"])
+    for name, r in sec.get("riprefs", {}).items():
+        L.append(f'constexpr uintptr_t RIPAT_{name} = {r["at"]};')
+        L.append(f'constexpr uintptr_t RIPLEN_{name} = {r["len"]};')
+        L += expect(name, r["expect_rva"])
+L.append("")
+
 L.append("// ---- standalone byte patterns ----")
 for name, p in meta.get("patterns", {}).items():
     L.append(f'constexpr char PATTERN_{name}[] = "{p["pattern"]}";')

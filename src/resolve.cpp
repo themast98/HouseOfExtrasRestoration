@@ -223,6 +223,59 @@ Resolved Build() {
         return r;
     }
 
+    // --- secondary anchors: the surviving DLC -> save-flag bridge ---
+    // Bob's menu is a talk-script select whose rows are gated on save flags in
+    // group 332. The PC build still ships the code that sets them from DLC
+    // entitlements, but never grants entitlements 0x17..0x19, so four rows can
+    // never appear. We reuse the game's own setter rather than poking bits.
+    //
+    // Deliberately non-fatal: the mode-completion fix is independent and
+    // already works, so a miss here costs the unlock, not the whole mod.
+    if (uintptr_t bridge = FindPattern(off::ANCHOR_DLC_FLAG_BRIDGE_PATTERN)) {
+        r.SetFlagAlias = ReadCall(bridge + off::CALLAT_SET_FLAG_ALIAS);
+        r.IsDlcOwned   = ReadCall(bridge + off::CALLAT_IS_DLC_OWNED);
+        Check("SetFlagAlias", r.SetFlagAlias, off::EXPECT_SET_FLAG_ALIAS);
+        Check("IsDlcOwned",   r.IsDlcOwned,   off::EXPECT_IS_DLC_OWNED);
+
+        // The bitset address lives inside IsDlcOwned's own lea, not in the
+        // pointer the bridge passes it (which the callee ignores outright).
+        uintptr_t owned = FindPattern(off::ANCHOR_IS_DLC_OWNED_PATTERN);
+        if (owned && owned == r.IsDlcOwned) {
+            r.GDlcMask = ReadRipRef(owned + off::RIPAT_G_DLC_MASK, off::RIPLEN_G_DLC_MASK);
+            Check("GDlcMask", r.GDlcMask, off::EXPECT_G_DLC_MASK);
+        } else if (owned) {
+            hoe::Log("  IsDlcOwned pattern +0x%llX disagrees with the bridge's call target +0x%llX",
+                     (unsigned long long)owned, (unsigned long long)r.IsDlcOwned);
+        }
+
+        // We call SetFlagAlias blind, so verify it still is the thin
+        // alias->(group,bit) decoder we reverse-engineered: read the manager's
+        // definition table at +0x990, then tail-jump to the raw setter. A
+        // reshaped function here would scribble on arbitrary save flags.
+        bool shapeOk = false;
+        if (InImage(r.SetFlagAlias)) {
+            const unsigned char* f = img + r.SetFlagAlias;
+            for (int i = 0; i < 0x50 && !shapeOk; ++i) {
+                if (f[i] == 0x48 && f[i + 1] == 0x8B && f[i + 2] == 0x81) {
+                    uint32_t disp;
+                    memcpy(&disp, f + i + 3, 4);
+                    shapeOk = (disp == (uint32_t)off::C_FLAGMGR_TABLE_FIELD);
+                }
+            }
+        }
+        if (!shapeOk) {
+            hoe::Log("  flag setter does not read flagMgr+0x%llX - refusing to call it",
+                     (unsigned long long)off::C_FLAGMGR_TABLE_FIELD);
+            r.SetFlagAlias = 0;
+        }
+
+        r.unlockOk = InImage(r.SetFlagAlias) && InImage(r.GDlcMask);
+    }
+    if (!r.unlockOk) {
+        hoe::Log("  mode unlock unavailable - only the rows the game already "
+                 "shows will appear in Bob's menu");
+    }
+
     r.ok = true;
     hoe::Log("resolve OK");
     return r;

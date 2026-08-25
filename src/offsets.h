@@ -34,6 +34,18 @@ constexpr uintptr_t RIPAT_K_FLOAT = 0x06;
 constexpr uintptr_t RIPLEN_K_FLOAT = 8;
 constexpr uintptr_t EXPECT_K_FLOAT = 0x122D46C;
 
+// ---- secondary anchors: same idiom, different entry points ----
+constexpr char ANCHOR_DLC_FLAG_BRIDGE_PATTERN[] = "BA 17 00 00 00 48 8D 0D ? ? ? ? E8 ? ? ? ? 48";
+constexpr uintptr_t EXPECT_DLC_FLAG_BRIDGE = 0xBCD251;
+constexpr uintptr_t CALLAT_IS_DLC_OWNED = 0x0C;
+constexpr uintptr_t EXPECT_IS_DLC_OWNED = 0xCB5970;
+constexpr uintptr_t CALLAT_SET_FLAG_ALIAS = 0x20;
+constexpr uintptr_t EXPECT_SET_FLAG_ALIAS = 0x28A7A0;
+constexpr char ANCHOR_IS_DLC_OWNED_PATTERN[] = "8B C2 48 8D 0D ? ? ? ? 48 C1 E8 05 44";
+constexpr uintptr_t RIPAT_G_DLC_MASK = 0x02;
+constexpr uintptr_t RIPLEN_G_DLC_MASK = 7;
+constexpr uintptr_t EXPECT_G_DLC_MASK = 0x1A21C50;
+
 // ---- standalone byte patterns ----
 constexpr char PATTERN_SET_RESULT_VARIANT[] = "48 83 EC 28 89 91 B8 01 00 00 44 89 81 BC 01 00 00";
 constexpr uintptr_t EXPECT_SET_RESULT_VARIANT = 0x3A46D0;
@@ -94,5 +106,12 @@ constexpr uintptr_t C_NETRANK_PANEL_SIZE = 0x28;
 constexpr uintptr_t C_NETRANK_LAYOUT_SIZE = 0x128;
 constexpr uintptr_t C_NETRANK_VALUE_FIELD = 0x20;
 constexpr uintptr_t C_HEAP_ID_UI = 10;
+constexpr uintptr_t C_FLAGMGR_TABLE_FIELD = 0x990;
+constexpr uintptr_t C_FLAG_ALIAS_SURVIVAL_TAG_SP = 0x648;
+constexpr uintptr_t C_FLAG_ALIAS_SPEED_KING = 0x649;
+constexpr uintptr_t C_FLAG_ALIAS_FASTEST_KILLER = 0x64A;
+constexpr uintptr_t C_DLC_BIT_SURVIVAL_TAG_SP = 0x17;
+constexpr uintptr_t C_DLC_BIT_SPEED_KING = 0x18;
+constexpr uintptr_t C_DLC_BIT_FASTEST_KILLER = 0x19;
 
 }  // namespace off
