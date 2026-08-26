@@ -2,7 +2,8 @@
 namespace config {
 struct Settings {
     int Enabled          = 1;
-    int ShowResultScreen = 1;   // 0 = skip straight to the exit step
+    int ShowResultScreen = 0;   // no local result screen is correct for these modes;
+                                // the original was an ONLINE leaderboard (see config.cpp)
     int ResultScreenId   = 225; // 225 = CActionTougijyoAllStarResult, what our sibling macro opens
     int ResultVariant    = 0;   // 0..3 - which result page of the layout to show
     int ResultHoldFrames = 180; // frames the screen holds before playing its "out" anim
