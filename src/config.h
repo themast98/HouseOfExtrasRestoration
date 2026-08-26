@@ -14,6 +14,7 @@ struct Settings {
     int ForceFadeIn      = 0;   // after opening, fade the screen back IN (test aid)
     int UnlockAllModes   = 1;   // show all of Bob's rows, not just Battle King
     int DiagMissionWatch = 1;   // log the running macro + step; names any hang
+    int RecapFreeze      = 0;   // hold the recap on screen and open a command channel
 };
 const Settings& Get();   // reads HouseOfExtras.ini once, writes defaults if absent
 }

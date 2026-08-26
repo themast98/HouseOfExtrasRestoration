@@ -6,3 +6,5 @@ refs/*.bin
 __pycache__/
 *.pyc
 refs/*.sllz
+*.cmd
+*.reply

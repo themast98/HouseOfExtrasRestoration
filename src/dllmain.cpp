@@ -5,6 +5,7 @@
 #include "resolve.h"
 #include "config.h"
 #include "game.h"
+#include "console.h"
 #include "log.h"
 
 extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self);
@@ -55,6 +56,8 @@ static DWORD WINAPI UnlockLoop(LPVOID) {
     bool announced = false;
     for (;;) {
         if (cfg.DiagMissionWatch) game::PollMissionState();
+        // Read-only console from here; mutation requires the game thread.
+        console::Pump(false);
         if (game::UnlockExtraModes() && !announced) {
             announced = true;
             if (game::IsDlcOwned) {

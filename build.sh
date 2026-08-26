@@ -8,6 +8,6 @@ python tools/gen_offsets.py
 mkdir -p build
 "$GXX" -shared -O2 -std=c++17 -static -Isrc \
     -o build/HouseOfExtras.asi \
-    src/dllmain.cpp src/log.cpp src/paths.cpp src/patch.cpp src/resolve.cpp src/config.cpp src/game.cpp src/recap.cpp src/records.cpp \
+    src/dllmain.cpp src/log.cpp src/paths.cpp src/console.cpp src/patch.cpp src/resolve.cpp src/config.cpp src/game.cpp src/recap.cpp src/records.cpp \
     -Wl,--kill-at
 echo "built: build/HouseOfExtras.asi ($(stat -c%s build/HouseOfExtras.asi) bytes)"

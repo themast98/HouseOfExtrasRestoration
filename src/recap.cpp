@@ -37,6 +37,7 @@
 #include "game.h"
 #include "config.h"
 #include "records.h"
+#include "console.h"
 #include "offsets.h"
 #include "log.h"
 
@@ -242,10 +243,14 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
         ++s_frames;
         // The setter dereferences the layout page array, so wait for the load.
         if (ScreenField(cfg.ResultScreenId, off::C_SCREEN_LOADED_FIELD) > 0) {
-            game::SetResultVariant(s_screen, cfg.ResultVariant, cfg.ResultHoldFrames);
+            // Freezing holds the banner open by giving it a hold count it will
+            // never reach, rather than by fighting the draw gate every frame.
+            const int hold = cfg.RecapFreeze ? 100000000 : cfg.ResultHoldFrames;
+            game::SetResultVariant(s_screen, cfg.ResultVariant, hold);
             hoe::Log("step 0x2C: layout loaded after %d frames; "
-                     "SetResultVariant(variant=%d, hold=%d)",
-                     s_frames, cfg.ResultVariant, cfg.ResultHoldFrames);
+                     "SetResultVariant(variant=%d, hold=%d)%s",
+                     s_frames, cfg.ResultVariant, hold,
+                     cfg.RecapFreeze ? "  [FROZEN - send commands via HouseOfExtras.cmd]" : "");
             if (cfg.DiagScreenState) {
                 LogScreenState("after setter", cfg.ResultScreenId);
                 LogElementState("after setter", cfg.ResultVariant);
@@ -266,10 +271,17 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
 
     case Stage::Showing: {
         ++s_frames;
+        const bool frozen = cfg.RecapFreeze && !console::ResumeRequested();
+        if (frozen) {
+            // Runs on the game thread, which is the only place engine calls
+            // that touch the layout system are safe.
+            console::Pump(true);
+        }
         if (ScreenSlot(mgr, cfg.ResultScreenId) == 0) {
             Finish(self, "screen closed itself");
             return;
         }
+        if (frozen) return;   // every exit below is disabled while frozen
         // Screen 220 is a TIMED BANNER, not an interactive panel: it has no
         // confirm-button state (that belongs to screen 225), and it never clears
         // its own slot. It simply shuts its draw gate once ResultHoldFrames have

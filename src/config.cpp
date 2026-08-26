@@ -98,7 +98,13 @@ void WriteDefaults(const char* p) {
         ";  every mode, including ones this mod does not patch. If any mode ever\n"
         ";  hangs, the log names the exact class and step it parked on instead of\n"
         ";  leaving you with a black screen and nothing to go on.\n"
-        "DiagMissionWatch=1\n", f);
+        "DiagMissionWatch=1\n"
+        "\n;  1 = hold the recap on screen indefinitely and poll HouseOfExtras.cmd\n"
+        ";  for commands, replying in HouseOfExtras.reply.\n"
+        ";  A development aid: it makes the recap inspectable and experimentable\n"
+        ";  live, instead of needing a fresh play session for every attempt.\n"
+        ";  Send `resume` to let it finish normally. Leave at 0 for play.\n"
+        "RecapFreeze=0\n", f);
     fclose(f);
 }
 
@@ -125,6 +131,7 @@ Settings Load() {
     s.ForceFadeIn      = GetPrivateProfileIntA("Results", "ForceFadeIn",      s.ForceFadeIn,      p);
     s.UnlockAllModes   = GetPrivateProfileIntA("Modes",   "UnlockAllModes",   s.UnlockAllModes,   p);
     s.DiagMissionWatch = GetPrivateProfileIntA("Modes",   "DiagMissionWatch", s.DiagMissionWatch, p);
+    s.RecapFreeze      = GetPrivateProfileIntA("Modes",   "RecapFreeze",      s.RecapFreeze,      p);
 
     // An unvalidated id indexes the screen-slot array (mainMgr + 0x1E8 + id*8).
     // slot(311) lands exactly on mainMgr+0xBA0, so 310 is the hard ceiling.
