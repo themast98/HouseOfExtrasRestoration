@@ -210,14 +210,20 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
         hoe::Log("step 0x2C: OpenScreen(%d) -> %p, parent=%p", cfg.ResultScreenId, scr, arg3);
         if (!scr) { Finish(self, "OpenScreen returned null"); return; }
 
-        // Test aid. Something EARLIER in the battle-end flow already faded the
-        // screen to opaque black - skipping our own mode-1 call does not undo it.
-        // mode 0 targets alpha 0, which lets the fade state machine finish and
-        // switch the overlay off entirely (state -> 0 stops it being drawn at
-        // all). If the panel then appears, it was simply underneath the fade.
+        // Test aid, and it was WRONG until measured live. TransitionSetup picks
+        // its target alpha as `(mode == 0 || mode == 1) ? 1.0f : 0.0f` - the
+        // constant is at RVA 0x1209ABC and really is 1.0 - so mode 0 fades to
+        // OPAQUE, not transparent. This call used mode 0 and was therefore
+        // driving the overlay to black, the exact opposite of "fade in": reading
+        // the live fade state during a frozen recap showed alpha 1.0 with the
+        // state byte set to 2 (still fading up).
+        //
+        // Any mode outside {0,1} targets alpha 0; 2 is used here. Clearing the
+        // overlay does reveal 2D UI that was hidden underneath it, so the effect
+        // is real - it simply is not what makes the recap panel appear.
         if (cfg.ForceFadeIn) {
-            game::TransitionSetup(mission, 0, 1.0f, 0, 1);
-            hoe::Log("step 0x2C: ForceFadeIn - requested fade to transparent");
+            game::TransitionSetup(mission, 2, 1.0f, 0, 1);
+            hoe::Log("step 0x2C: ForceFadeIn - fading the overlay OUT (mode 2)");
         }
 
         s_screen = scr;
