@@ -344,6 +344,74 @@ def test_only_colosseum_extra_has_gutted_step_handlers(img, offsets):
     )
 
 
+def _screen_class(img, offsets, screen_id):
+    """Resolve a screen id the way OpenScreen does, then name the class its
+    factory constructs: id -> range index -> factory -> ctor -> vftable -> RTTI."""
+    c = offsets["constants"]
+    lo_t = int(c["SCREEN_ID_RANGE_LO"], 16)
+    hi_t = int(c["SCREEN_ID_RANGE_HI"], 16)
+    tab = int(c["SCREEN_FACTORY_TABLE"], 16)
+
+    idx = None
+    for i in range(int(c["SCREEN_ID_RANGE_COUNT"])):
+        lo = struct.unpack_from("<i", img, lo_t + i * 4)[0]
+        hi = struct.unpack_from("<i", img, hi_t + i * 4)[0]
+        if lo <= screen_id <= hi:
+            idx = i
+            break
+    assert idx is not None, f"screen id {screen_id} matches no range"
+    factory = _thunk(img, struct.unpack_from("<Q", img, tab + idx * 8)[0] - DUMP_BASE)
+
+    # Walk the factory and the ctors it calls, looking for a stored vftable.
+    seen, stack = set(), [(factory, 0)]
+    while stack:
+        fn, depth = stack.pop(0)
+        if fn in seen or depth > 2:
+            continue
+        seen.add(fn)
+        for off in range(fn, min(fn + 0x180, TEXT_HI - 8)):
+            # lea rax, [rip+disp] : 48 8D 05 disp32
+            if img[off:off + 3] == b"\x48\x8d\x05":
+                tgt = off + 7 + struct.unpack_from("<i", img, off + 3)[0]
+                try:
+                    col = struct.unpack_from("<Q", img, tgt - 8)[0] - DUMP_BASE
+                    td = struct.unpack_from("<I", img, col + 12)[0]
+                    end = img.find(b"\0", td + 16, td + 200)
+                    nm = img[td + 16:end].decode("ascii", "replace")
+                    if nm.startswith(".?AV"):
+                        return idx, factory, nm
+                except Exception:
+                    pass
+            if img[off] == 0xE8:                        # call rel32
+                stack.append((_thunk(img, off + 5 + struct.unpack_from("<i", img, off + 1)[0]),
+                              depth + 1))
+    return idx, factory, None
+
+
+def test_screen_ids_select_the_classes_we_think(img, offsets):
+    """The crux of the recap fix, and the thing that was wrong for a long time.
+
+    OpenScreen's id is not a "screen number" - it selects a CLASS through a
+    factory table, and 220 is a CAPTION BANNER, not a recap. Opening it gave a
+    perfectly healthy object that simply had nothing to show. If a rebuild ever
+    renumbers these, the mod would silently drive the wrong object again."""
+    c = offsets["constants"]
+    expected = {
+        int(c["SCREEN_ID_CAPTION"]):          "CActionSurvivalCaption",
+        int(c["SCREEN_ID_BATTLE_RESULT"]):    "CActionSurvivalBattleResult",
+        int(c["SCREEN_ID_ONIGOKKO_RESULT"]):  "CActionSurvivalOnigokkoResult",
+        int(c["SCREEN_ID_TOUGIJYO_RESULT"]):  "CActionTougijyoAllStarResult",
+    }
+    for sid, want in expected.items():
+        idx, factory, got = _screen_class(img, offsets, sid)
+        assert got == f".?AV{want}@@", (
+            f"screen {sid} (idx {idx}, factory sub_{factory:X}) builds {got}, expected {want}"
+        )
+
+    # and the mod must default to the recap, never the caption
+    assert int(c["SCREEN_ID_BATTLE_RESULT"]) != int(c["SCREEN_ID_CAPTION"])
+
+
 def test_patch_sites_are_stubs_with_room(img, offsets):
     for name, s in offsets["rtti"]["COLOSSEUM_EXTRA"]["slots"].items():
         rva = int(s["expect_rva"], 16)

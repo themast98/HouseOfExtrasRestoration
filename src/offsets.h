@@ -148,5 +148,13 @@ constexpr uintptr_t C_LAYOUT_NAME_FIELD = 0xC;
 constexpr uintptr_t C_LAYOUT_FLAGS_FIELD = 0x118;
 constexpr uintptr_t C_RES_FLAGS_FIELD = 0x0;
 constexpr uintptr_t C_RES_CSB_FIELD = 0x8;
+constexpr uintptr_t C_SCREEN_ID_RANGE_LO = 0x12363E0;
+constexpr uintptr_t C_SCREEN_ID_RANGE_HI = 0x1236850;
+constexpr uintptr_t C_SCREEN_FACTORY_TABLE = 0x16E4910;
+constexpr uintptr_t C_SCREEN_ID_RANGE_COUNT = 281;
+constexpr uintptr_t C_SCREEN_ID_CAPTION = 220;
+constexpr uintptr_t C_SCREEN_ID_BATTLE_RESULT = 222;
+constexpr uintptr_t C_SCREEN_ID_ONIGOKKO_RESULT = 223;
+constexpr uintptr_t C_SCREEN_ID_TOUGIJYO_RESULT = 225;
 
 }  // namespace off

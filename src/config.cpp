@@ -45,19 +45,24 @@ void WriteDefaults(const char* p) {
         ";  1 = show the results screen\n"
         "ShowResultScreen=1\n"
         "\n;  Screen id opened for the results screen. Valid range 0-310.\n"
-        ";  220 = pjs_dlc_survivalbtl_end (default) - the House of Extras results\n"
-        ";        layout. Its constructor leaves the draw gate closed; the mod calls\n"
-        ";        the engine's own setter to open it and play the 'in' animation.\n"
-        ";  225 = pjs_dlc_result - the Coliseum tournament result. It also wants\n"
-        ";        tougijyo_all.bin, and was observed registering but never finishing\n"
-        ";        its load, so it stayed blank.\n"
-        "ResultScreenId=220\n"
-        "\n;  Which page of the results layout to show, 0-3. The layout has four\n"
-        ";  pages built from these textures: svbtl_clear, svbtl_congra, svbtl_mission,\n"
-        ";  svbtl_boss / oni_timeover. If the wrong banner appears, try another value.\n"
+        ";  The id picks a CLASS through the engine's factory table, and they are\n"
+        ";  NOT interchangeable:\n"
+        ";  222 = CActionSurvivalBattleResult (default) - the actual recap. It\n"
+        ";        drives itself: loads, displays, waits for you, then closes.\n"
+        ";  223 = CActionSurvivalOnigokkoResult - the tag-mode recap.\n"
+        ";  220 = CActionSurvivalCaption - a CAPTION BANNER, not a recap at all.\n"
+        ";        This was the default for a long time and is exactly why nothing\n"
+        ";        ever appeared: the object was healthy, it just was not the recap.\n"
+        ";  225 = CActionTougijyoAllStarResult - the Coliseum tournament result,\n"
+        ";        which is what the untouched Colosseum handler opens.\n"
+        "ResultScreenId=222\n"
+        "\n;  Caption banners only (ResultScreenId=220): which of the four banner\n"
+        ";  pages to show, 0-3 - svbtl_clear, svbtl_congra, svbtl_mission,\n"
+        ";  svbtl_boss / oni_timeover. Ignored by the real result actions, which\n"
+        ";  choose their own content.\n"
         "ResultVariant=0\n"
-        "\n;  Frames the screen holds before it plays its close animation.\n"
-        ";  Retail call sites use 30, 40 and 180.\n"
+        "\n;  Caption banners only: frames to hold before the close animation.\n"
+        ";  Retail call sites use 30, 40 and 180. Result actions time themselves.\n"
         "ResultHoldFrames=180\n"
         "\n;  Seconds to wait for you to dismiss the results screen (0-3600).\n"
         ";  120 is far longer than anyone needs to read a recap, and guarantees the\n"
@@ -138,8 +143,8 @@ Settings Load() {
     // An unvalidated id indexes the screen-slot array (mainMgr + 0x1E8 + id*8).
     // slot(311) lands exactly on mainMgr+0xBA0, so 310 is the hard ceiling.
     if (s.ResultScreenId < 0 || s.ResultScreenId > 310) {
-        hoe::Log("config: ResultScreenId=%d out of range 0-310, using 225", s.ResultScreenId);
-        s.ResultScreenId = 225;
+        hoe::Log("config: ResultScreenId=%d out of range 0-310, using 222", s.ResultScreenId);
+        s.ResultScreenId = 222;
     }
     // sub_3A46D0 silently does nothing (leaves the draw gate shut) unless the
     // variant is 0..3, which is exactly why the ctor's 4 sentinel renders nothing.

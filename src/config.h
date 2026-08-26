@@ -3,7 +3,7 @@ namespace config {
 struct Settings {
     int Enabled          = 1;
     int ShowResultScreen = 1;   // 0 = skip straight to the exit step
-    int ResultScreenId   = 220; // 220 = pjs_dlc_survivalbtl_end (the Extras results screen)
+    int ResultScreenId   = 222; // 222 = CActionSurvivalBattleResult (the real recap)
     int ResultVariant    = 0;   // 0..3 - which result page of the layout to show
     int ResultHoldFrames = 180; // frames the screen holds before playing its "out" anim
     int TrackBestScore   = 1;   // CActionColosseumExtra+0x208, confirmed 3/4/6

@@ -7,25 +7,29 @@
 // precisely why the `ret 0` stub span forever. We use that to run the whole
 // recap lifecycle here:
 //
-//   Fresh     open the results screen (220 = pjs_dlc_survivalbtl_end)
+//   Fresh     open the results screen (222 = CActionSurvivalBattleResult)
 //   Opening   wait for its screen slot to become non-null      (bounded)
-//   Loading   wait for the layout to finish loading, then call the engine's own
-//             result-variant setter                            (bounded)
-//   Showing   hold while the player reads it, until the screen closes itself
+//   Loading   caption ids only: wait for the layout, then call the engine's
+//             own variant setter. A result action skips this entirely.
+//   Showing   wait until the action closes itself               (bounded)
 //   done      queue step 0x2E (cleanup / back to Naomi's Palace)
 //
-// WHY THE SETTER MATTERS. Screen 220's constructor leaves [obj+0x1C0] = 0, and
-// its Draw returns immediately while that is zero. The engine's own setter
-// sub_3A46D0(screen, variant, holdFrames) writes the variant to +0x1B8, the hold
-// to +0x1BC, opens the draw gate at +0x1C0, AND plays the layout page's type-0
-// "in" animation. That animation is what sets bit 0 of the element's flags word,
-// and the element updater returns unless that bit is set - so writing the fields
-// by hand would still render nothing. It also does nothing at all unless the
-// variant is 0..3, which is why the constructor's 4 sentinel stays blank.
+// WHICH SCREEN. OpenScreen maps an id through a range table to a factory, and
+// the ids are NOT interchangeable:
+//     220 -> CActionSurvivalCaption          a caption banner
+//     222 -> CActionSurvivalBattleResult     the survival-battle recap
+//     223 -> CActionSurvivalOnigokkoResult   the tag-mode recap
+//     225 -> CActionTougijyoAllStarResult    the Coliseum tournament result
+// This mod drove 220 for a long time and could not understand why an object
+// that loaded, ticked at 60fps, animated to completion and had an open draw
+// gate still showed nothing: it was the caption, and captions are suppressed
+// outside the states that show them. Its four "variants" are the
+// svbtl_clear / congra / mission / boss banner art, not recap pages.
 //
-// ORDERING: the setter dereferences the layout page array unconditionally, so
-// calling it before the layout has loaded ([obj+0x1A8] != 0) is a null deref.
-// Hence the separate Loading stage.
+// A result action needs none of the caption dance - it loads, displays, waits
+// for the player and closes itself. And the caption setter must NEVER be
+// pointed at one: it writes a variant to +0x1B8, where a result action keeps an
+// allocated pointer, so the call would corrupt it.
 //
 // Live screens are kept in an array indexed by SCREEN ID:
 //     slot(id) = mainMgr + 0x1E8 + id*8
@@ -71,10 +75,35 @@ int      s_frames   = 0;
 uint64_t s_lastTick = 0;
 void*    s_screen   = nullptr;
 
-// Screen object sizes, from each handler's allocation site. Every diagnostic
+// What each screen id actually constructs. OpenScreen maps an id through a
+// range table (lo at RVA 0x12363E0, hi at 0x1236850) to an index, then jumps
+// to a factory in the table at RVA 0x16E4910:
+//
+//   217 -> CActionSurvivalBattleManager
+//   220 -> CActionSurvivalCaption          a CAPTION BANNER, not a recap
+//   222 -> CActionSurvivalBattleResult     the survival-battle recap
+//   223 -> CActionSurvivalOnigokkoResult   the tag-mode recap
+//   225 -> CActionTougijyoAllStarResult    what the Coliseum reference opens
+//
+// This mod spent a long time driving 220 and wondering why a perfectly healthy
+// object showed nothing: it is the caption, whose four "variants" are the
+// svbtl_clear / congra / mission / boss banner art.
+constexpr int kCaptionScreenId = 220;
+
+// The caption-only setter. CActionSurvivalCaption keeps a variant at +0x1B8;
+// CActionSurvivalBattleResult keeps an ALLOCATED POINTER there, so calling the
+// setter on a result action would overwrite that pointer and crash. Hence this
+// is gated on the exact id rather than on "is a screen open".
+bool UsesCaptionSetter(int id) { return id == kCaptionScreenId; }
+
+// Screen object sizes, from each factory's allocation site. Every diagnostic
 // read is bounded by these so the probe cannot run off the end of the object.
+// An unknown id returns 0, which disables field probing entirely - the field
+// MEANINGS are per-class, so probing an unrecognised class would be nonsense
+// even where it is in-bounds.
 size_t ScreenSize(int id) {
     if (id == 220) return 0x1C8;   // sub_333260: mov ecx, 0x1C8
+    if (id == 222) return 0x1D8;   // sub_3331D0: mov ecx, 0x1D8
     if (id == 225) return 0x220;   // sub_333A40: mov ecx, 0x220
     return 0;
 }
@@ -247,6 +276,17 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
 
     case Stage::Loading: {
         ++s_frames;
+        // A result action drives its own lifecycle: it loads, shows, waits for
+        // the player and closes itself. There is nothing for us to poke, and
+        // its fields do not mean what the caption's do, so go straight to
+        // waiting for it to finish.
+        if (!UsesCaptionSetter(cfg.ResultScreenId)) {
+            hoe::Log("step 0x2C: screen %d is a self-driving result action; "
+                     "waiting for it to finish", cfg.ResultScreenId);
+            s_stage = Stage::Showing;
+            s_frames = 0;
+            return;
+        }
         // The setter dereferences the layout page array, so wait for the load.
         if (ScreenField(cfg.ResultScreenId, off::C_SCREEN_LOADED_FIELD) > 0) {
             // Freezing holds the banner open by giving it a hold count it will
@@ -293,7 +333,11 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
         // its own slot. It simply shuts its draw gate once ResultHoldFrames have
         // elapsed. Waiting on the slot therefore always ran to the timeout, so
         // treat the gate closing as the natural end of the banner.
-        if (ScreenField(cfg.ResultScreenId, off::C_SCREEN_DRAWGATE_FIELD) == 0) {
+        // The draw-gate test is the CAPTION's end condition: screen 220 is a
+        // timed banner that never clears its own slot, it just shuts its gate.
+        // A result action does clear its slot, which the check above catches.
+        if (UsesCaptionSetter(cfg.ResultScreenId) &&
+            ScreenField(cfg.ResultScreenId, off::C_SCREEN_DRAWGATE_FIELD) == 0) {
             Finish(self, "banner finished (draw gate closed)");
             return;
         }
@@ -301,7 +345,9 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
             char when[32];
             snprintf(when, sizeof(when), "showing f%d", s_frames);
             LogScreenState(when, cfg.ResultScreenId);
-            LogElementState(when, cfg.ResultVariant);
+            if (UsesCaptionSetter(cfg.ResultScreenId)) {
+                LogElementState(when, cfg.ResultVariant);
+            }
         }
         // 0 disables the timeout entirely (wait for the player indefinitely).
         if (cfg.ResultTimeoutSec > 0 &&
