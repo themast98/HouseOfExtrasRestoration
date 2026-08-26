@@ -151,6 +151,38 @@ void LogElementState(const char* when, int variant) {
     if (!s_dumped) { s_dumped = true; game::LogAllLayoutSlots(when); }
 }
 
+// A result action that dereferences another action's object without checking
+// it. Opening one of these while its prerequisite is absent faults inside the
+// game's own constructor, so we check first.
+//
+//   222 CActionSurvivalBattleResult   -> slot 217 CActionSurvivalBattleManager
+//                                        loaded at sub_3A3A55, used unchecked
+//   223 CActionSurvivalOnigokkoResult -> slot 212, which it DOES null-check;
+//                                        listed anyway so the rule is uniform
+int RequiredScreenId(int id) {
+    if (id == 222) return 217;
+    if (id == 223) return 212;
+    return -1;
+}
+
+uint64_t ScreenSlot(void* mgr, int screenId);
+
+// The screens that decide which recap is even possible in this mode.
+void LogRelevantScreens(void* mgr) {
+    static const struct { int id; const char* what; } kWatch[] = {
+        {212, "onigokko prerequisite"},
+        {217, "CActionSurvivalBattleManager (222 needs this)"},
+        {220, "CActionSurvivalCaption"},
+        {222, "CActionSurvivalBattleResult"},
+        {223, "CActionSurvivalOnigokkoResult"},
+        {225, "CActionTougijyoAllStarResult"},
+    };
+    for (const auto& w : kWatch) {
+        const uint64_t p = ScreenSlot(mgr, w.id);
+        hoe::Log("  screens: %3d %-46s %s", w.id, w.what, p ? "OPEN" : "-");
+    }
+}
+
 uint64_t ScreenSlot(void* mgr, int screenId) {
     // screenId is range-checked in config::Load(), so this stays in the array.
     const uintptr_t off = off::C_SCREEN_SLOT_BASE + (uintptr_t)screenId * 8;
@@ -221,6 +253,26 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
 
         if (!cfg.ShowResultScreen) { Finish(self, "results disabled"); return; }
 
+        // Which screens are live right now. This is what tells us whether a
+        // result action's prerequisite is even available in this mode.
+        if (cfg.DiagScreenState) LogRelevantScreens(mgr);
+
+        // A result action may dereference another action without checking it.
+        // CActionSurvivalBattleResult (222) loads mainMgr+0x8B0 = slot(217) at
+        // sub_3A3A55 and passes it straight to sub_3A3230, which does
+        // `cmp [rcx+0x1a8], ebx` - an unconditional dereference. The null test
+        // just above it guards mainMgr, NOT the pointer it loads. So opening
+        // 222 without a CActionSurvivalBattleManager is a hard crash inside
+        // Sega's own constructor, and it is our job never to trigger it.
+        const int need = RequiredScreenId(cfg.ResultScreenId);
+        if (need >= 0 && ScreenSlot(mgr, need) == 0) {
+            hoe::Log("step 0x2C: screen %d requires screen %d to be open, and it "
+                     "is not - refusing to open it (that would crash inside the "
+                     "game's constructor)", cfg.ResultScreenId, need);
+            Finish(self, "result screen prerequisite missing");
+            return;
+        }
+
         void* mission = *(void**)((unsigned char*)self + off::C_MISSION_FIELD);
         if (cfg.CallTransitionSetup) {
             game::TransitionSetup(mission, 1, *game::pKFloat, 0, 0);
@@ -230,6 +282,10 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
         game::CommitFlags(*game::pFlagMgr);
 
         void* arg3 = *(void**)((unsigned char*)mgr + off::C_OPENSCREEN_ARG3_FIELD);
+        // Logged BEFORE the call. OpenScreen runs a constructor that can fault,
+        // and when it did the log simply stopped with no indication of where -
+        // this line makes the next crash self-identifying.
+        hoe::Log("step 0x2C: opening screen %d...", cfg.ResultScreenId);
         void* scr  = game::OpenScreen(mgr, cfg.ResultScreenId, arg3);
 
         // The reference handler does `lea edx,[r9+0x1D]` with r9d==1, so the

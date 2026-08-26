@@ -47,15 +47,26 @@ void WriteDefaults(const char* p) {
         "\n;  Screen id opened for the results screen. Valid range 0-310.\n"
         ";  The id picks a CLASS through the engine's factory table, and they are\n"
         ";  NOT interchangeable:\n"
-        ";  222 = CActionSurvivalBattleResult (default) - the actual recap. It\n"
-        ";        drives itself: loads, displays, waits for you, then closes.\n"
-        ";  223 = CActionSurvivalOnigokkoResult - the tag-mode recap.\n"
+        ";  Each result screen belongs to a MACRO FAMILY, and the untouched\n"
+        ";  handlers show which goes with which:\n"
+        ";      CMissionMacroColosseum        -> 225\n"
+        ";      CMissionMacroSurvivalBattle   -> 222\n"
+        ";      CMissionMacroAdventureSurvive -> 223\n"
+        ";      CMissionMacroColosseumExtra   -> deleted; this mod supplies it\n"
+        ";\n"
+        ";  225 = CActionTougijyoAllStarResult (default) - what the untouched\n"
+        ";        CMissionMacroColosseum opens for this exact step, and House of\n"
+        ";        Extras runs on its direct sibling. Safe: every pointer its\n"
+        ";        constructor touches is null-checked.\n"
+        ";  222 = CActionSurvivalBattleResult - belongs to the survival-battle\n"
+        ";        flow. Its constructor loads screen 217 and dereferences it\n"
+        ";        WITHOUT a null check, so opening it from any other mode is a\n"
+        ";        hard crash. The mod refuses unless 217 is already live.\n"
+        ";  223 = CActionSurvivalOnigokkoResult - the tag-mode result.\n"
         ";  220 = CActionSurvivalCaption - a CAPTION BANNER, not a recap at all.\n"
         ";        This was the default for a long time and is exactly why nothing\n"
         ";        ever appeared: the object was healthy, it just was not the recap.\n"
-        ";  225 = CActionTougijyoAllStarResult - the Coliseum tournament result,\n"
-        ";        which is what the untouched Colosseum handler opens.\n"
-        "ResultScreenId=222\n"
+        "ResultScreenId=225\n"
         "\n;  Caption banners only (ResultScreenId=220): which of the four banner\n"
         ";  pages to show, 0-3 - svbtl_clear, svbtl_congra, svbtl_mission,\n"
         ";  svbtl_boss / oni_timeover. Ignored by the real result actions, which\n"
@@ -143,8 +154,8 @@ Settings Load() {
     // An unvalidated id indexes the screen-slot array (mainMgr + 0x1E8 + id*8).
     // slot(311) lands exactly on mainMgr+0xBA0, so 310 is the hard ceiling.
     if (s.ResultScreenId < 0 || s.ResultScreenId > 310) {
-        hoe::Log("config: ResultScreenId=%d out of range 0-310, using 222", s.ResultScreenId);
-        s.ResultScreenId = 222;
+        hoe::Log("config: ResultScreenId=%d out of range 0-310, using 225", s.ResultScreenId);
+        s.ResultScreenId = 225;
     }
     // sub_3A46D0 silently does nothing (leaves the draw gate shut) unless the
     // variant is 0..3, which is exactly why the ctor's 4 sentinel renders nothing.
