@@ -61,6 +61,11 @@ constexpr uintptr_t EXPECT_MISSION_TICK = 0xB6AD7D;
 constexpr uintptr_t RIPAT_G_MISSION_MGR = 0x2C1;
 constexpr uintptr_t RIPLEN_G_MISSION_MGR = 7;
 constexpr uintptr_t EXPECT_G_MISSION_MGR = 0x1A195E0;
+constexpr char ANCHOR_LAYOUT_NAMES_READ_PATTERN[] = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 20 48 8B 3D ? ? ? ? 33 ED 8B DD 8D 75 28";
+constexpr uintptr_t EXPECT_LAYOUT_NAMES_READ = 0x482E60;
+constexpr uintptr_t RIPAT_G_LAYOUT_NAMES = 0x14;
+constexpr uintptr_t RIPLEN_G_LAYOUT_NAMES = 7;
+constexpr uintptr_t EXPECT_G_LAYOUT_NAMES = 0x19807F8;
 
 // ---- standalone byte patterns ----
 constexpr char PATTERN_SET_RESULT_VARIANT[] = "48 83 EC 28 89 91 B8 01 00 00 44 89 81 BC 01 00 00";

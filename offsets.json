@@ -250,6 +250,19 @@
           "expect_rva": "0x1A195E0"
         }
       }
+    },
+    "LAYOUT_NAMES_READ": {
+      "comment": "sub_482E60 - reads the per-slot layout NAME table. Like the resource table, the RVA holds a POINTER (`mov rdi, qword ptr [rip+disp]`), so it must be dereferenced. Gives every live slot a readable name, which is what lets us compare the recap's slot against layouts that are visibly rendering.",
+      "pattern": "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 20 48 8B 3D ? ? ? ? 33 ED 8B DD 8D 75 28",
+      "expect_rva": "0x482E60",
+      "calls": {},
+      "riprefs": {
+        "G_LAYOUT_NAMES": {
+          "at": "0x14",
+          "len": 7,
+          "expect_rva": "0x19807F8"
+        }
+      }
     }
   }
 }

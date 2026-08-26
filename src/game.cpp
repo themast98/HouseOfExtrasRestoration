@@ -21,6 +21,7 @@ LayoutPageReadyFn LayoutPageReady = nullptr;
 // array itself. Getting these two the same way was the original bug.
 static void**         s_pLayoutRes   = nullptr;
 static void**         s_layoutTexPar = nullptr;
+static void**         s_pLayoutNames = nullptr;   // POINTER to the name table
 static void**         s_pMissionMgr  = nullptr;
 void**            pMainMgr        = nullptr;
 void**            pFlagMgr        = nullptr;
@@ -51,6 +52,7 @@ bool Bind() {
         LayoutPageReady = (LayoutPageReadyFn)(b + r.LayoutPageReady);
         s_pLayoutRes    = (void**)           (b + r.GLayoutRes);
         s_layoutTexPar  = (void**)           (b + r.GLayoutTexPar);
+        if (r.GLayoutNames) s_pLayoutNames = (void**)(b + r.GLayoutNames);
     }
     return true;
 }
@@ -170,6 +172,39 @@ bool LogLayoutResources(const char* when, void* layout) {
                  "does not claim to be texture-free", when);
     }
     return true;
+}
+
+// Every live slot, side by side. A null texture handle on the recap's slot only
+// means something if the layouts that ARE on screen have a non-null one, and
+// this is the cheapest way to settle that without another play session.
+void LogAllLayoutSlots(const char* when) {
+    if (!s_pLayoutRes || !s_layoutTexPar) return;
+    auto table = (unsigned char*)*s_pLayoutRes;
+    if (!table) return;
+    auto names = s_pLayoutNames ? (const char**)*s_pLayoutNames : nullptr;
+
+    int live = 0, withTex = 0;
+    hoe::Log("  slotdump %s: slot name                              "
+             "res.flags pages texpar", when);
+    for (int i = 0; i < (int)off::C_LAYOUT_SLOT_COUNT; ++i) {
+        auto entry = table + (uintptr_t)i * off::C_LAYOUT_RES_STRIDE;
+        const unsigned f = *(unsigned*)(entry + off::C_RES_FLAGS_FIELD);
+        const int pages  = *(int*)(entry + off::C_LAYOUT_RES_COUNT_FIELD);
+        void* tex        = s_layoutTexPar[i];
+        if (!f && !pages && !tex) continue;            // slot never used
+        ++live;
+        if (tex) ++withTex;
+        const char* nm = "?";
+        if (names) {
+            const char* n = names[i];
+            // The table is engine-owned; only trust a plausible in-heap string.
+            if (n && *n >= 0x20 && *n < 0x7F) nm = n;
+        }
+        hoe::Log("  slotdump %s: %4d %-32.32s 0x%-7X %5d %p",
+                 when, i, nm, f, pages, tex);
+    }
+    hoe::Log("  slotdump %s: %d live slots, %d of them have a texture archive",
+             when, live, withTex);
 }
 
 // MSVC stores a Complete Object Locator pointer immediately before every

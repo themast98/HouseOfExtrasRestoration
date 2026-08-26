@@ -56,6 +56,7 @@ struct Resolved {
     uintptr_t LayoutGetPane   = 0;   // sub_484220(layout, index) -> pane
     uintptr_t GLayoutRes      = 0;   // per-layout resource table, stride 0x70
     uintptr_t GLayoutTexPar   = 0;   // per-layout texture-archive handle table
+    uintptr_t GLayoutNames    = 0;   // POINTER to the per-slot name table
     bool      layoutDiagOk    = false;
 
     // pattern: sub_3A46D0(screen, variant, holdFrames) - the result-variant

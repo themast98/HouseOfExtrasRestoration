@@ -319,6 +319,13 @@ Resolved Build() {
             Check("GLayoutTexPar", r.GLayoutTexPar, off::C_G_LAYOUT_TEXPAR_EXPECT);
         }
 
+        if (uintptr_t nm = FindPattern(off::ANCHOR_LAYOUT_NAMES_READ_PATTERN)) {
+            Check("LayoutNamesRead", nm, off::EXPECT_LAYOUT_NAMES_READ);
+            r.GLayoutNames = ReadRipRef(nm + off::RIPAT_G_LAYOUT_NAMES,
+                                        off::RIPLEN_G_LAYOUT_NAMES);
+            Check("GLayoutNames", r.GLayoutNames, off::EXPECT_G_LAYOUT_NAMES);
+        }
+
         r.layoutDiagOk = InImage(r.LayoutHasPages) && InImage(r.LayoutPageReady) &&
                          InImage(r.LayoutGetPane)  && InImage(r.GLayoutRes) &&
                          InImage(r.GLayoutTexPar);

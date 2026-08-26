@@ -49,6 +49,12 @@ bool UnlockExtraModes();
 // the log and returns false if the layout could not be inspected at all.
 bool LogLayoutResources(const char* when, void* layout);
 
+// Dumps every live layout slot: name, resource flags, page count and whether
+// it has a texture archive. The point is comparison - if layouts that are
+// visibly on screen also have a null texture handle, then a null handle on the
+// recap's slot proves nothing and the search moves elsewhere.
+void LogAllLayoutSlots(const char* when);
+
 // Samples the running mission macro (class, macro id, current and next step).
 // Logs only when something changes, so a whole play session costs a handful of
 // lines but a mode that parks forever names the exact class and step it stuck

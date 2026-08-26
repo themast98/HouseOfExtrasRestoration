@@ -116,6 +116,9 @@ void LogElementState(const char* when, int variant) {
              when, layout, variant, page, elem, flags, (flags & 1) ? 1 : 0,
              *(int*)(elem + off::C_ELEM_SUPPRESS_FIELD));
     game::LogLayoutResources(when, layout);
+    static bool s_dumped = false;
+    // Once per session is enough - it is a comparison, not a time series.
+    if (!s_dumped) { s_dumped = true; game::LogAllLayoutSlots(when); }
 }
 
 uint64_t ScreenSlot(void* mgr, int screenId) {
