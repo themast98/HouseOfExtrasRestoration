@@ -66,6 +66,11 @@ constexpr uintptr_t EXPECT_LAYOUT_NAMES_READ = 0x482E60;
 constexpr uintptr_t RIPAT_G_LAYOUT_NAMES = 0x14;
 constexpr uintptr_t RIPLEN_G_LAYOUT_NAMES = 7;
 constexpr uintptr_t EXPECT_G_LAYOUT_NAMES = 0x19807F8;
+constexpr char ANCHOR_LAYOUT_SLOT_COUNT_READ_PATTERN[] = "48 83 EC 28 3B 0D ? ? ? ? 73 44 8B C1";
+constexpr uintptr_t EXPECT_LAYOUT_SLOT_COUNT_READ = 0x487860;
+constexpr uintptr_t RIPAT_G_LAYOUT_SLOT_COUNT = 0x04;
+constexpr uintptr_t RIPLEN_G_LAYOUT_SLOT_COUNT = 6;
+constexpr uintptr_t EXPECT_G_LAYOUT_SLOT_COUNT = 0x1980D20;
 
 // ---- standalone byte patterns ----
 constexpr char PATTERN_SET_RESULT_VARIANT[] = "48 83 EC 28 89 91 B8 01 00 00 44 89 81 BC 01 00 00";
@@ -88,6 +93,16 @@ constexpr char PATTERN_NETRANK_DRAW[] = "40 53 48 83 EC 20 33 D2 48 8B D9 E8 ? ?
 constexpr uintptr_t EXPECT_NETRANK_DRAW = 0x85DEC0;
 constexpr char PATTERN_TEXPAR_LOAD[] = "40 53 55 56 57 41 56 48 81 EC 60 01 00 00 48 C7 44 24 30 FE FF FF FF 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 50 01 00 00 49 8B E8 48 63";
 constexpr uintptr_t EXPECT_TEXPAR_LOAD = 0x482780;
+constexpr char PATTERN_BUILD_PAGES[] = "40 55 56 57 41 56 41 57 48 83 EC 40 48 C7 44 24 30 FE FF FF FF 48 89 5C 24 78 44";
+constexpr uintptr_t EXPECT_BUILD_PAGES = 0x484510;
+constexpr char PATTERN_GET_PAGE[] = "4C 8B 81 10 01 00 00 4D";
+constexpr uintptr_t EXPECT_GET_PAGE = 0x484220;
+constexpr char PATTERN_SET_SUPPRESS[] = "89 91 BC 00 00 00 C3 CC CC CC CC";
+constexpr uintptr_t EXPECT_SET_SUPPRESS = 0x48AC40;
+constexpr char PATTERN_HEAP_FREE[] = "48 85 C9 74 42 53 48 83 EC 30";
+constexpr uintptr_t EXPECT_HEAP_FREE = 0x3C64D0;
+constexpr char PATTERN_LAYOUT_RELEASE[] = "40 53 48 83 EC 30 48 C7 44 24 20 FE FF FF FF 48 8B D9 48 8D 05 ? ? ? ? 48 89 01 48 8B 89 20 01";
+constexpr uintptr_t EXPECT_LAYOUT_RELEASE = 0x483EB0;
 
 // ---- RTTI: type descriptor -> COL -> vftable -> slot ----
 constexpr char TYPENAME_COLOSSEUM_EXTRA[] = ".?AVCMissionMacroColosseumExtra@@";

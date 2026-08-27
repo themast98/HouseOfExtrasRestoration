@@ -5,183 +5,230 @@
 #include "patch.h"
 #include "log.h"
 
+#include <string.h>
+
 namespace netrank {
 namespace {
 
-// The panel object the sibling widget uses: 0x28 bytes, layout pointer at +0,
-// two bound panes at +8 and +0x10, and the int it prints as %d at +0x20.
-constexpr int  kPanelSize  = 0x28;
-constexpr int  kLayoutSize = 0x128;
-constexpr int  kValueField = 0x20;
-constexpr int  kHeapUi     = 10;
+// ---------------------------------------------------------------------------
+// WHY THIS DOES NOT USE THE MINIGAME WIDGET
+//
+// The first two attempts drove NETRANK_BIND (sub_85E330) on this layout and
+// crashed the game both times. It was never a null dereference: that function
+// loops over ALL of a layout's pages and stores each page pointer at
+// [panel + 8 + i*8], into a panel allocated with 0x28 bytes.
+// pjs_mg_net_ranking, which it was written for, has 3 pages and fits.
+// pjs_net_ranking has 17, so it writes 0x90 bytes into a 0x28 block - about a
+// hundred bytes of heap corruption, faulting later and elsewhere. No amount of
+// argument guarding could have helped; the callee itself was wrong for us.
+//
+// WHAT ACTUALLY DRAWS A LAYOUT
+//
+// Nothing needs to own it. Drawing is driven by a global intrusive list of
+// layout ELEMENTS, walked once per frame by the render pass. Every element the
+// page builder creates appends itself to that list, and is drawn when:
+//     elem[0x2b] selects the 2D pass  - 0 by construction on this build path
+//     elem[0x2c] bit0 is set          - the builder sets it
+//     elem[0xBC] == 0                 - "not suppressed"; the builder sets 1
+// So after a successful build the entire job is to clear elem[0xBC] on the
+// pages we want visible. There is no per-frame draw call to make.
+// ---------------------------------------------------------------------------
 
-// The layout the DELETED code drew. The surviving widget's own loader
-// hardcodes "pjs_mg_net_ranking" (the minigame board), which is why we call
-// LoadLayout ourselves instead of reusing NETRANK_LOADLAYOUT.
-const char kLayoutName[] = "pjs_net_ranking";
+constexpr int kLayoutSize = 0x128;
+constexpr int kHeapUi     = 10;
 
-// ~10s at 60fps for the csb to stream in. Bounded like every other wait in
-// this mod: a panel that never loads must not hold the game.
+// LoadLayout scans the caller's name 16 bytes at a time before finding the NUL,
+// so it gets a padded static buffer rather than a bare string literal.
+alignas(16) char kLayoutName[0x110] = "pjs_net_ranking";
+
+// ~10s at 60fps for the csb to stream in.
 constexpr int kLoadTimeoutFrames = 600;
 
-void*  s_panel  = nullptr;
-bool   s_bound  = false;
-bool   s_shown  = false;
-bool   s_failed = false;   // give up rather than retry a broken layout forever
-int    s_frames = 0;
+void* s_layout = nullptr;
+int   s_slot   = -1;
+int   s_pages  = 0;
+bool  s_built  = false;
+bool  s_shown  = false;
+bool  s_failed = false;
+int   s_frames = 0;
 
-}  // namespace
+struct Fns {
+    void  (*PushHeap)(int, int);
+    void* (*Alloc)(unsigned long long);
+    void  (*PopHeap)();
+    void* (*LoadLayout)(void*, const char*, int);
+    int   (*BuildPages)(void*, int);
+    void* (*GetPage)(void*, int);
+    void  (*SetSuppress)(void*, int);
+    void  (*Free)(void*);
+    void  (*ReleaseLayout)(void*);
+    int   (*HasPages)(void*);
+    const int* SlotCount;
+};
 
-bool IsOpen() { return s_panel != nullptr; }
-
-bool Open() {
+bool Bind(Fns& f) {
     const auto& r = resolve::Get();
-    if (!r.netRankOk) { hoe::Log("netrank: pieces did not resolve, cannot build"); return false; }
-    if (s_panel)      { hoe::Log("netrank: already open"); return true; }
-
+    if (!r.netRankOk || !r.LayoutHasPages) return false;
     const uintptr_t b = hoe::Base();
-    auto pushHeap = (void(*)(int, int))          (b + r.HeapPush);
-    auto alloc    = (void*(*)(unsigned long long))(b + r.HeapAlloc);
-    auto popHeap  = (void(*)())                   (b + r.HeapPop);
-    auto ctor     = (void*(*)(void*))             (b + r.NetRankCtor);
-    auto loadLay  = (void*(*)(void*, const char*, int))(b + r.LayoutLoad);
-
-    // The engine's own screen factories scope their allocations to the UI heap
-    // before constructing, so do the same rather than allocating wherever the
-    // caller happens to have left the current heap.
-    pushHeap(kHeapUi, 0);
-    void* panel = alloc(kPanelSize);
-    if (panel) {
-        ctor(panel);                                  // zeroes all 0x28 bytes
-        // Mirror NETRANK_LOADLAYOUT exactly: allocate the layout, load into it,
-        // and store the LOADER'S RETURN (not the allocation) at panel[0]. If the
-        // allocation fails it stores null, which the widget then treats as
-        // "no layout" rather than faulting.
-        void* mem = alloc(kLayoutSize);
-        void* lay = mem ? loadLay(mem, kLayoutName, 0) : nullptr;
-        *(void**)panel = lay;
-        hoe::Log("netrank: panel=%p layout=%p ('%s')", panel, lay, kLayoutName);
-    }
-    popHeap();
-
-    if (!panel || !*(void**)panel) {
-        hoe::Log("netrank: allocation or layout load failed");
-        // The panel block itself is engine-owned once allocated; leave it be
-        // rather than guessing at a free that may not match the heap it came from.
-        s_panel = nullptr;
-        return false;
-    }
-    s_panel = panel;
-    s_bound = s_shown = s_failed = false;
-    s_frames = 0;
+    f.PushHeap      = (void(*)(int, int))               (b + r.HeapPush);
+    f.Alloc         = (void*(*)(unsigned long long))    (b + r.HeapAlloc);
+    f.PopHeap       = (void(*)())                       (b + r.HeapPop);
+    f.LoadLayout    = (void*(*)(void*, const char*, int))(b + r.LayoutLoad);
+    f.BuildPages    = (int(*)(void*, int))              (b + r.BuildPages);
+    f.GetPage       = (void*(*)(void*, int))            (b + r.GetPage);
+    f.SetSuppress   = (void(*)(void*, int))             (b + r.SetSuppress);
+    f.Free          = (void(*)(void*))                  (b + r.HeapFree);
+    f.ReleaseLayout = (void(*)(void*))                  (b + r.LayoutRelease);
+    f.HasPages      = (int(*)(void*))                   (b + r.LayoutHasPages);
+    f.SlotCount     = (const int*)                      (b + r.GLayoutSlotCount);
     return true;
 }
 
+// page -> element, both checked. Returns null if either is missing.
+void* ElementOf(const Fns& f, int i) {
+    void* page = f.GetPage(s_layout, i);      // returns null if pages is null;
+    if (!page) return nullptr;                // never bounds-checks i, hence s_pages
+    return *(void**)((unsigned char*)page + off::C_PAGE_ELEM_FIELD);
+}
+
+}  // namespace
+
+bool IsOpen() { return s_layout != nullptr; }
 bool Failed() { return s_failed; }
 
+bool Open() {
+    Fns f;
+    if (!Bind(f)) { hoe::Log("netrank: pieces did not resolve, cannot build"); return false; }
+    if (s_layout) return true;
+
+    f.PushHeap(kHeapUi, 0);
+    void* lay = f.Alloc(kLayoutSize);
+    if (lay) {
+        memset(lay, 0, kLayoutSize);
+        // LoadLayout writes a vtable at [obj] and the name at [obj+0xC], so it
+        // must be given real memory; both engine callers null-check the
+        // allocation exactly like this before handing it over.
+        f.LoadLayout(lay, kLayoutName, 0);
+    }
+    f.PopHeap();
+
+    if (!lay) { hoe::Log("netrank: allocation failed"); return false; }
+
+    // The slot must be inside the engine's own bound. LoadLayout leaves -1 when
+    // every slot is busy, and the page builder indexes the resource table with
+    // it unchecked - a -1 reads 0x70 bytes BEFORE the table.
+    const int slot  = *(int*)((unsigned char*)lay + off::C_LAYOUT_RES_INDEX_FIELD);
+    const int limit = f.SlotCount ? *f.SlotCount : 0;
+    if (slot < 0 || limit <= 0 || slot >= limit) {
+        hoe::Log("netrank: layout slot %d outside 0..%d - releasing and giving up",
+                 slot, limit - 1);
+        // Release even on this path: a load already claimed the slot's flags, so
+        // simply dropping the object would burn one of the few slots for good.
+        f.ReleaseLayout(lay);
+        f.Free(lay);
+        return false;
+    }
+
+    s_layout = lay;
+    s_slot   = slot;
+    s_pages  = 0;
+    s_built = s_shown = s_failed = false;
+    s_frames = 0;
+    hoe::Log("netrank: layout=%p slot=%d ('%s')", lay, slot, kLayoutName);
+    return true;
+}
+
 bool Ready() {
-    if (!s_panel || s_failed) return false;
-    if (s_bound)  return true;
+    if (!s_layout || s_failed) return false;
+    if (s_built) return true;
 
-    const auto& r = resolve::Get();
-    const uintptr_t b = hoe::Base();
-    auto bind = (void(*)(void*))(b + r.NetRankBind);
-
+    Fns f;
+    if (!Bind(f)) return false;
     ++s_frames;
-    void* layout = *(void**)s_panel;
 
-    // GUARD 1 - the slot. Bind reaches sub_484510, which does
-    //     mov eax,[rbx+8] ; imul rcx,rax,0x70 ; mov ebp,[rcx+table+0x18]
-    // with NO bounds check. LoadLayout leaves -1 there when it finds no free
-    // slot, and -1 walks off the front of the table, producing a garbage page
-    // count that the builder then allocates and loops over. That is what
-    // crashed the game on the first attempt at this panel.
-    const int slot = game::LayoutSlot(layout);
-    if (slot < 0) {
-        hoe::Log("netrank: layout has no valid slot (LoadLayout found none free) "
-                 "- abandoning the panel rather than letting the builder run");
+    // The builder returns 0 for as many frames as the async csb request needs,
+    // and 1 exactly once, on the frame it actually builds. Falling through on a
+    // 0 return is the single most likely way to crash here, because the page
+    // array is still null and GetPage would hand back null.
+    if (!f.HasPages(s_layout)) {
+        if (f.BuildPages(s_layout, 0) == 0) {
+            if (s_frames % 60 == 0) {
+                hoe::Log("netrank: waiting for the csb, %d frames", s_frames);
+            }
+            if (s_frames > kLoadTimeoutFrames) {
+                hoe::Log("netrank: csb never arrived - giving up");
+                s_failed = true;
+            }
+            return false;
+        }
+    }
+    // Re-test rather than trusting the return: the builder can report success
+    // in paths where the page array is still not usable.
+    if (!f.HasPages(s_layout)) return false;
+
+    s_pages = game::LayoutPageCount(s_layout);
+    if (s_pages <= 0) {
+        hoe::Log("netrank: built but reports %d pages - giving up", s_pages);
         s_failed = true;
         return false;
     }
 
-    // GUARD 2 - the page count. sub_484510 is a ONE-SHOT builder: it allocates
-    // `count` pages and then latches "built" forever. Run it while the csb is
-    // still in flight and count is 0, and the layout is permanently stuck with
-    // an empty page array. So wait for the engine to publish pages first.
-    const int pages = game::LayoutPageCount(layout);
-    if (pages <= 0) {
-        if (s_frames % 60 == 0) {
-            hoe::Log("netrank: waiting for the csb (slot %d, pages %d) after %d frames",
-                     slot, pages, s_frames);
-        }
-        if (s_frames > kLoadTimeoutFrames) {
-            hoe::Log("netrank: csb never published pages - abandoning the panel");
+    // Verify EVERY page and element before touching any of them. The pane pool
+    // is a fixed free list, and this layout needs far more panes than the
+    // minigame one, so an exhausted pool leaving a null element is a live path.
+    for (int i = 0; i < s_pages; ++i) {
+        if (!ElementOf(f, i)) {
+            hoe::Log("netrank: page %d of %d has no element - giving up", i, s_pages);
             s_failed = true;
+            return false;
         }
-        return false;
     }
 
-    // Only now is it safe to build and bind.
-    bind(s_panel);
-    const int hasPages = (layout && game::LayoutHasPages) ? game::LayoutHasPages(layout) : 0;
-    if (hasPages) {
-        s_bound = true;
-        hoe::Log("netrank: bound after %d frames; panes=%p,%p", s_frames,
-                 *(void**)((unsigned char*)s_panel + 8),
-                 *(void**)((unsigned char*)s_panel + 0x10));
-        game::LogLayoutResources("netrank", layout);
-    } else if (s_frames % 60 == 0) {
-        hoe::Log("netrank: still loading after %d frames", s_frames);
-    }
-    return s_bound;
+    s_built = true;
+    hoe::Log("netrank: built after %d frames, %d pages, all elements present",
+             s_frames, s_pages);
+    return true;
 }
 
 void Show(int latest, int best) {
-    if (!s_panel || !s_bound || s_shown) return;
-    const auto& r = resolve::Get();
-    const uintptr_t b = hoe::Base();
-    auto show = (void(*)(void*, int, int))(b + r.NetRankShow);
+    if (!s_layout || !s_built || s_shown) return;
+    Fns f;
+    if (!Bind(f)) return;
 
-    // One int field exists on this widget; the second number needs a pane the
-    // minigame version does not use, so `best` is logged for now and wired up
-    // once the live panel shows which panes pjs_net_ranking actually has.
-    *(int*)((unsigned char*)s_panel + kValueField) = latest;
+    // The builder creates every page suppressed. Clearing that on page 0 is the
+    // whole of "show it" - the render pass picks the element up off the global
+    // list by itself on the next frame.
+    void* elem = ElementOf(f, 0);
+    if (!elem) { hoe::Log("netrank: page 0 element vanished"); return; }
+    f.SetSuppress(elem, 0);
 
-    // Show() indexes panel[8 + group*8] and dereferences it. Bind fills those
-    // from the layout's panes, and pjs_net_ranking need not have the same panes
-    // as the minigame board this widget was written for - so a group whose pane
-    // did not bind is skipped rather than passed to the engine as null.
-    auto pane = [&](int g) { return *(void**)((unsigned char*)s_panel + 8 + g * 8); };
-    for (int g = 0; g < 2; ++g) {
-        if (pane(g)) show(s_panel, g, 1);
-        else hoe::Log("netrank: group %d has no bound pane, not showing it", g);
-    }
     s_shown = true;
-    hoe::Log("netrank: shown  latest=%d best=%d  (panel %p, value field +0x%X)",
-             latest, best, s_panel, kValueField);
+    hoe::Log("netrank: page 0 unsuppressed (latest=%d best=%d) - the numbers are "
+             "not wired up yet, this is the layout only", latest, best);
 }
 
 void Draw() {
-    if (!s_panel || !s_shown) return;
-    const auto& r = resolve::Get();
-    auto draw = (void(*)(void*))(hoe::Base() + r.NetRankDraw);
-    draw(s_panel);
+    // Deliberately empty. Drawing is done by the engine's own render pass off
+    // the global element list; there is nothing to call per frame.
 }
 
 void Close() {
-    if (!s_panel) return;
-    const auto& r = resolve::Get();
-    const uintptr_t b = hoe::Base();
-    auto show = (void(*)(void*, int, int))(b + r.NetRankShow);
-    auto pane = [&](int g) { return *(void**)((unsigned char*)s_panel + 8 + g * 8); };
-    // Hide before dropping the reference. The widget's own release path was
-    // never resolved to a unique signature, so the panel and its layout are
-    // deliberately LEAKED rather than freed with a guessed deallocator - a
-    // handful of bytes once per run, against the risk of a bad free.
-    for (int g = 0; g < 2; ++g) if (pane(g)) show(s_panel, g, 0);
-    hoe::Log("netrank: closed (panel %p intentionally not freed)", s_panel);
-    s_panel = nullptr;
-    s_bound = s_shown = s_failed = false;
+    if (!s_layout) return;
+    Fns f;
+    if (!Bind(f)) { s_layout = nullptr; return; }
+
+    // ReleaseLayout is not optional and not merely a free: it destroys the page
+    // array through its vector-deleting destructor, and that is what UNLINKS
+    // each element from the global render list. Skip it and the renderer keeps
+    // walking freed memory a frame later.
+    f.ReleaseLayout(s_layout);
+    f.Free(s_layout);
+    hoe::Log("netrank: released layout %p (slot %d)", s_layout, s_slot);
+
+    s_layout = nullptr;
+    s_slot = -1;
+    s_pages = 0;
+    s_built = s_shown = s_failed = false;
     s_frames = 0;
 }
 

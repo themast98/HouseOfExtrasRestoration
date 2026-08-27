@@ -300,6 +300,21 @@ Resolved Build() {
     r.NetRankShow = FindPattern(off::PATTERN_NETRANK_SHOW);
     r.NetRankDraw = FindPattern(off::PATTERN_NETRANK_DRAW);
     r.NetRankBind = FindPattern(off::ANCHOR_NETRANK_BIND_PATTERN);
+    r.BuildPages    = FindPattern(off::PATTERN_BUILD_PAGES);
+    r.GetPage       = FindPattern(off::PATTERN_GET_PAGE);
+    r.SetSuppress   = FindPattern(off::PATTERN_SET_SUPPRESS);
+    r.HeapFree      = FindPattern(off::PATTERN_HEAP_FREE);
+    r.LayoutRelease = FindPattern(off::PATTERN_LAYOUT_RELEASE);
+    if (uintptr_t sc = FindPattern(off::ANCHOR_LAYOUT_SLOT_COUNT_READ_PATTERN)) {
+        r.GLayoutSlotCount = ReadRipRef(sc + off::RIPAT_G_LAYOUT_SLOT_COUNT,
+                                        off::RIPLEN_G_LAYOUT_SLOT_COUNT);
+        Check("GLayoutSlotCount", r.GLayoutSlotCount, off::EXPECT_G_LAYOUT_SLOT_COUNT);
+    }
+    Check("BuildPages",    r.BuildPages,    off::EXPECT_BUILD_PAGES);
+    Check("GetPage",       r.GetPage,       off::EXPECT_GET_PAGE);
+    Check("SetSuppress",   r.SetSuppress,   off::EXPECT_SET_SUPPRESS);
+    Check("HeapFree",      r.HeapFree,      off::EXPECT_HEAP_FREE);
+    Check("LayoutRelease", r.LayoutRelease, off::EXPECT_LAYOUT_RELEASE);
     Check("HeapPush",     r.HeapPush,     off::EXPECT_HEAP_PUSH);
     Check("HeapAlloc",    r.HeapAlloc,    off::EXPECT_HEAP_ALLOC);
     Check("HeapPop",      r.HeapPop,      off::EXPECT_HEAP_POP);
@@ -308,10 +323,14 @@ Resolved Build() {
     Check("NetRankBind",  r.NetRankBind,  off::EXPECT_NETRANK_BIND);
     Check("NetRankShow",  r.NetRankShow,  off::EXPECT_NETRANK_SHOW);
     Check("NetRankDraw",  r.NetRankDraw,  off::EXPECT_NETRANK_DRAW);
+    // NetRankBind/Show/Draw are deliberately NOT required: reusing that widget on
+    // this layout overflows its 0x28-byte panel (see netrank.cpp). What the panel
+    // actually needs is the generic layout path.
     r.netRankOk = InImage(r.HeapPush) && InImage(r.HeapAlloc) && InImage(r.HeapPop) &&
-                  InImage(r.LayoutLoad) && InImage(r.NetRankCtor) &&
-                  InImage(r.NetRankBind) && InImage(r.NetRankShow) &&
-                  InImage(r.NetRankDraw);
+                  InImage(r.LayoutLoad) && InImage(r.BuildPages) &&
+                  InImage(r.GetPage) && InImage(r.SetSuppress) &&
+                  InImage(r.HeapFree) && InImage(r.LayoutRelease) &&
+                  InImage(r.GLayoutSlotCount);
     if (!r.netRankOk) hoe::Log("  net-ranking panel unavailable (non-fatal)");
 
     // --- mission manager (diagnostics only, never fatal) ---

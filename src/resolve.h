@@ -69,8 +69,14 @@ struct Resolved {
     uintptr_t LayoutLoad        = 0;   // LoadLayout(obj, name, noTextures)
     uintptr_t NetRankCtor       = 0;   // zeroes the 0x28 panel
     uintptr_t NetRankBind       = 0;   // binds panes once the csb has loaded
-    uintptr_t NetRankShow       = 0;   // Show(group, on)
-    uintptr_t NetRankDraw       = 0;   // draws the stored int as %d
+    uintptr_t NetRankShow       = 0;   // Show(group, on)   [UNUSED - see netrank.cpp]
+    uintptr_t NetRankDraw       = 0;   // draws the stored int as %d  [UNUSED]
+    uintptr_t BuildPages        = 0;   // sub_484510(layout, kind), one-shot
+    uintptr_t GetPage           = 0;   // sub_484220(layout, i), unbounded index
+    uintptr_t SetSuppress       = 0;   // sub_48AC40(elem, v): elem[0xBC] = v
+    uintptr_t HeapFree          = 0;   // sub_3C64D0(ptr), null-safe
+    uintptr_t LayoutRelease     = 0;   // sub_483EB0(layout): unlinks elements too
+    uintptr_t GLayoutSlotCount  = 0;   // authoritative slot bound
     bool      netRankOk         = false;
 
     // pattern: sub_3A46D0(screen, variant, holdFrames) - the result-variant

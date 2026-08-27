@@ -187,6 +187,31 @@
       "comment": "sub_482780(name, slot, arg) - the ONLY caller-visible loader of a layout's texture archive ('<prefix><name>.par'), stashing the handle in a global slot table. LoadLayout never touches textures, so a layout can be live, animating and draw-gated open while being entirely invisible. We read the table's address out of the absolute displacement at +0x55 (not RIP-relative).",
       "pattern": "40 53 55 56 57 41 56 48 81 EC 60 01 00 00 48 C7 44 24 30 FE FF FF FF 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 50 01 00 00 49 8B E8 48 63",
       "expect_rva": "0x482780"
+    },
+    "BUILD_PAGES": {
+      "comment": "sub_484510(layout, kind) - ONE-SHOT page builder. Returns 1 only on the call that actually builds; 0 while the csb request is still in flight. Never fall through on 0.",
+      "pattern": "40 55 56 57 41 56 41 57 48 83 EC 40 48 C7 44 24 30 FE FF FF FF 48 89 5C 24 78 44",
+      "expect_rva": "0x484510"
+    },
+    "GET_PAGE": {
+      "comment": "sub_484220(layout, i) - returns NULL when layout->pages is NULL, and NEVER bounds-checks i.",
+      "pattern": "4C 8B 81 10 01 00 00 4D",
+      "expect_rva": "0x484220"
+    },
+    "SET_SUPPRESS": {
+      "comment": "sub_48AC40(elem, v) - elem[0xBC] = v. 0 = visible, non-zero = suppressed.",
+      "pattern": "89 91 BC 00 00 00 C3 CC CC CC CC",
+      "expect_rva": "0x48AC40"
+    },
+    "HEAP_FREE": {
+      "comment": "sub_3C64D0(ptr) - the partner of the allocator, and null-safe (test rcx,rcx; je ret). NOT 0x3C6240, which lands mid-instruction and does not decode.",
+      "pattern": "48 85 C9 74 42 53 48 83 EC 30",
+      "expect_rva": "0x3C64D0"
+    },
+    "LAYOUT_RELEASE": {
+      "comment": "sub_483EB0(layout) - releases the pages through their vector-deleting destructor, which UNLINKS each element from the global render list at 0x1980D70. Without it the renderer walks freed memory.",
+      "pattern": "40 53 48 83 EC 30 48 C7 44 24 20 FE FF FF FF 48 8B D9 48 8D 05 ? ? ? ? 48 89 01 48 8B 89 20 01",
+      "expect_rva": "0x483EB0"
     }
   },
   "anchors": {
@@ -269,6 +294,19 @@
           "at": "0x14",
           "len": 7,
           "expect_rva": "0x19807F8"
+        }
+      }
+    },
+    "LAYOUT_SLOT_COUNT_READ": {
+      "comment": "sub_487860 opens with `cmp ecx, [0x1980D20]; jae fail` - the authoritative upper bound on layout slots. Read it rather than trusting the 40 derived from table spacing.",
+      "pattern": "48 83 EC 28 3B 0D ? ? ? ? 73 44 8B C1",
+      "expect_rva": "0x487860",
+      "calls": {},
+      "riprefs": {
+        "G_LAYOUT_SLOT_COUNT": {
+          "at": "0x04",
+          "len": 6,
+          "expect_rva": "0x1980D20"
         }
       }
     }
