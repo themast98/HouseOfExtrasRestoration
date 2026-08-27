@@ -207,6 +207,21 @@ void LogAllLayoutSlots(const char* when) {
              when, live, withTex);
 }
 
+int LayoutSlot(void* layout) {
+    if (!layout) return -1;
+    const int idx = *(int*)((unsigned char*)layout + off::C_LAYOUT_RES_INDEX_FIELD);
+    return (idx >= 0 && idx < (int)off::C_LAYOUT_SLOT_COUNT) ? idx : -1;
+}
+
+int LayoutPageCount(void* layout) {
+    const int idx = LayoutSlot(layout);
+    if (idx < 0 || !s_pLayoutRes) return -1;
+    auto table = (unsigned char*)*s_pLayoutRes;
+    if (!table) return -1;
+    return *(int*)(table + (uintptr_t)idx * off::C_LAYOUT_RES_STRIDE
+                         + off::C_LAYOUT_RES_COUNT_FIELD);
+}
+
 // MSVC stores a Complete Object Locator pointer immediately before every
 // polymorphic vftable, so the class name is a couple of pointer hops away - no
 // scanning. Worth it: it turns "vft=+0x1384968" in the log into a name we can

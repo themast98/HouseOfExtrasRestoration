@@ -55,6 +55,15 @@ bool LogLayoutResources(const char* when, void* layout);
 // recap's slot proves nothing and the search moves elsewhere.
 void LogAllLayoutSlots(const char* when);
 
+// The layout's slot index, and how many pages the engine has published for
+// it. Both are needed BEFORE calling anything that builds pages: the builder
+// reads layout[8] and indexes the resource table with it unchecked, so a -1
+// slot (LoadLayout found none free) walks off the front of the table, and a
+// zero count makes the one-shot builder latch 'built' with no pages at all.
+// Return -1 when the value cannot be read.
+int LayoutSlot(void* layout);
+int LayoutPageCount(void* layout);
+
 // Samples the running mission macro (class, macro id, current and next step).
 // Logs only when something changes, so a whole play session costs a handful of
 // lines but a mode that parks forever names the exact class and step it stuck

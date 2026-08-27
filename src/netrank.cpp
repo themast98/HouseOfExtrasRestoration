@@ -20,9 +20,14 @@ constexpr int  kHeapUi     = 10;
 // LoadLayout ourselves instead of reusing NETRANK_LOADLAYOUT.
 const char kLayoutName[] = "pjs_net_ranking";
 
+// ~10s at 60fps for the csb to stream in. Bounded like every other wait in
+// this mod: a panel that never loads must not hold the game.
+constexpr int kLoadTimeoutFrames = 600;
+
 void*  s_panel  = nullptr;
 bool   s_bound  = false;
 bool   s_shown  = false;
+bool   s_failed = false;   // give up rather than retry a broken layout forever
 int    s_frames = 0;
 
 }  // namespace
@@ -67,13 +72,15 @@ bool Open() {
         return false;
     }
     s_panel = panel;
-    s_bound = s_shown = false;
+    s_bound = s_shown = s_failed = false;
     s_frames = 0;
     return true;
 }
 
+bool Failed() { return s_failed; }
+
 bool Ready() {
-    if (!s_panel) return false;
+    if (!s_panel || s_failed) return false;
     if (s_bound)  return true;
 
     const auto& r = resolve::Get();
@@ -81,11 +88,41 @@ bool Ready() {
     auto bind = (void(*)(void*))(b + r.NetRankBind);
 
     ++s_frames;
-    // Bind builds the pages, but only once the csb has actually arrived - it
-    // bails while the load is still in flight - so it is called every frame
-    // until the layout reports that it has pages.
-    bind(s_panel);
     void* layout = *(void**)s_panel;
+
+    // GUARD 1 - the slot. Bind reaches sub_484510, which does
+    //     mov eax,[rbx+8] ; imul rcx,rax,0x70 ; mov ebp,[rcx+table+0x18]
+    // with NO bounds check. LoadLayout leaves -1 there when it finds no free
+    // slot, and -1 walks off the front of the table, producing a garbage page
+    // count that the builder then allocates and loops over. That is what
+    // crashed the game on the first attempt at this panel.
+    const int slot = game::LayoutSlot(layout);
+    if (slot < 0) {
+        hoe::Log("netrank: layout has no valid slot (LoadLayout found none free) "
+                 "- abandoning the panel rather than letting the builder run");
+        s_failed = true;
+        return false;
+    }
+
+    // GUARD 2 - the page count. sub_484510 is a ONE-SHOT builder: it allocates
+    // `count` pages and then latches "built" forever. Run it while the csb is
+    // still in flight and count is 0, and the layout is permanently stuck with
+    // an empty page array. So wait for the engine to publish pages first.
+    const int pages = game::LayoutPageCount(layout);
+    if (pages <= 0) {
+        if (s_frames % 60 == 0) {
+            hoe::Log("netrank: waiting for the csb (slot %d, pages %d) after %d frames",
+                     slot, pages, s_frames);
+        }
+        if (s_frames > kLoadTimeoutFrames) {
+            hoe::Log("netrank: csb never published pages - abandoning the panel");
+            s_failed = true;
+        }
+        return false;
+    }
+
+    // Only now is it safe to build and bind.
+    bind(s_panel);
     const int hasPages = (layout && game::LayoutHasPages) ? game::LayoutHasPages(layout) : 0;
     if (hasPages) {
         s_bound = true;
@@ -144,7 +181,7 @@ void Close() {
     for (int g = 0; g < 2; ++g) if (pane(g)) show(s_panel, g, 0);
     hoe::Log("netrank: closed (panel %p intentionally not freed)", s_panel);
     s_panel = nullptr;
-    s_bound = s_shown = false;
+    s_bound = s_shown = s_failed = false;
     s_frames = 0;
 }
 

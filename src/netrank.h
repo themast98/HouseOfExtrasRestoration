@@ -42,4 +42,9 @@ void Close();
 // True while a panel exists (between Open and Close).
 bool IsOpen();
 
+// True once the panel has been abandoned as unusable (no free layout slot,
+// or the csb never published any pages). The caller should stop waiting and
+// finish the step; retrying would only re-run the same broken path.
+bool Failed();
+
 }  // namespace netrank

@@ -394,6 +394,12 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
     case Stage::Showing: {
         ++s_frames;
         if (s_panel) {
+            if (netrank::Failed()) {
+                netrank::Close();
+                s_panel = false;
+                Finish(self, "net-ranking panel could not be built");
+                return;
+            }
             if (netrank::Ready()) {
                 const int kills = game::ReadKillCount();
                 netrank::Show(kills > 0 ? kills : 0, records::GetBest(kModeBattleKing));
