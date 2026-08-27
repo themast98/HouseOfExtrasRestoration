@@ -7,12 +7,19 @@
 // precisely why the `ret 0` stub span forever. We use that to run the whole
 // recap lifecycle here:
 //
-//   Fresh     open the results screen (222 = CActionSurvivalBattleResult)
-//   Opening   wait for its screen slot to become non-null      (bounded)
-//   Loading   caption ids only: wait for the layout, then call the engine's
-//             own variant setter. A result action skips this entirely.
-//   Showing   wait until the action closes itself               (bounded)
+//   Fresh     build the real panel on pjs_net_ranking (netrank::Open), or
+//             fall back to opening a stock result screen if that is off
+//   Opening   stock path only: wait for the screen slot to fill   (bounded)
+//   Loading   stock path, caption ids only: wait for the layout, then call the
+//             engine's own variant setter
+//   Showing   drive our panel, or wait for a stock action to close (bounded)
 //   done      queue step 0x2E (cleanup / back to Naomi's Palace)
+//
+// THE REAL PANEL. PS3 footage with no PSN connection shows the end screen as
+// NETWORK RANKING / -Battle King Ranking (Kiryu)- / Score / Latest Record /
+// Best Record - a small LOCAL panel, not a leaderboard. Its layout
+// (pjs_net_ranking) and all of its artwork still ship on PC; only the board
+// name and the two numbers were lost with src/ranking. See netrank.cpp.
 //
 // WHICH SCREEN. OpenScreen maps an id through a range table to a factory, and
 // the ids are NOT interchangeable:
@@ -42,6 +49,7 @@
 #include "config.h"
 #include "records.h"
 #include "console.h"
+#include "netrank.h"
 #include "offsets.h"
 #include "log.h"
 
@@ -74,6 +82,7 @@ Stage    s_stage    = Stage::Fresh;
 int      s_frames   = 0;
 uint64_t s_lastTick = 0;
 void*    s_screen   = nullptr;
+bool     s_panel    = false;   // our own pjs_net_ranking panel is up
 
 // What each screen id actually constructs. OpenScreen maps an id through a
 // range table (lo at RVA 0x12363E0, hi at 0x1236850) to an index, then jumps
@@ -190,6 +199,7 @@ uint64_t ScreenSlot(void* mgr, int screenId) {
 }
 
 void Finish(void* self, const char* why) {
+    if (s_panel) { netrank::Close(); s_panel = false; }
     game::SetNextStep(self, (int)off::C_STEP_2E);
     hoe::Log("step 0x2C: %s -> step 0x2E (exit)", why);
     s_stage = Stage::Fresh;
@@ -249,6 +259,16 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
             hoe::Log("step 0x2C: score=%d previous best=%d%s", kills, prev, best ? " (NEW BEST)" : "");
         } else {
             hoe::Log("step 0x2C: score field unresolved (read %d), not recorded", kills);
+        }
+
+        // The real end-of-mode panel: rebuild it on pjs_net_ranking rather than
+        // borrowing another mode's result screen. Falls through to the old
+        // screen-opening path only if this is off or could not be built.
+        if (cfg.NetRankingPanel && netrank::Open()) {
+            s_panel = true;
+            s_stage = Stage::Showing;
+            s_frames = 0;
+            return;
         }
 
         if (!cfg.ShowResultScreen) { Finish(self, "results disabled"); return; }
@@ -373,6 +393,24 @@ extern "C" __attribute__((ms_abi)) void HoE_Step2C(void* self) {
 
     case Stage::Showing: {
         ++s_frames;
+        if (s_panel) {
+            if (netrank::Ready()) {
+                const int kills = game::ReadKillCount();
+                netrank::Show(kills > 0 ? kills : 0, records::GetBest(kModeBattleKing));
+            }
+            netrank::Draw();
+            const bool frozenPanel = cfg.RecapFreeze && !console::ResumeRequested();
+            if (frozenPanel) { console::Pump(true); return; }
+            // Bounded like every other wait here: the panel has no dismiss
+            // handling yet, so it must not be able to hold the game forever.
+            if (cfg.ResultTimeoutSec > 0 &&
+                s_frames > cfg.ResultTimeoutSec * 60) {
+                netrank::Close();
+                s_panel = false;
+                Finish(self, "net-ranking panel timed out");
+            }
+            return;
+        }
         const bool frozen = cfg.RecapFreeze && !console::ResumeRequested();
         if (frozen) {
             // Runs on the game thread, which is the only place engine calls

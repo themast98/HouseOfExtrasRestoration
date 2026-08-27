@@ -287,6 +287,33 @@ Resolved Build() {
                  "shows will appear in Bob's menu");
     }
 
+    // --- the network-ranking panel (optional, never fatal) ---
+    // pjs_net_ranking is the layout the deleted src/ranking code drew. It still
+    // ships, and so does the sibling widget for the minigame version of the same
+    // panel, so we can drive it ourselves. NETRANK_BIND comes from its anchor
+    // rather than a standalone pattern.
+    r.HeapPush    = FindPattern(off::PATTERN_HEAP_PUSH);
+    r.HeapAlloc   = FindPattern(off::PATTERN_HEAP_ALLOC);
+    r.HeapPop     = FindPattern(off::PATTERN_HEAP_POP);
+    r.LayoutLoad  = FindPattern(off::PATTERN_LAYOUT_LOAD);
+    r.NetRankCtor = FindPattern(off::PATTERN_NETRANK_CTOR);
+    r.NetRankShow = FindPattern(off::PATTERN_NETRANK_SHOW);
+    r.NetRankDraw = FindPattern(off::PATTERN_NETRANK_DRAW);
+    r.NetRankBind = FindPattern(off::ANCHOR_NETRANK_BIND_PATTERN);
+    Check("HeapPush",     r.HeapPush,     off::EXPECT_HEAP_PUSH);
+    Check("HeapAlloc",    r.HeapAlloc,    off::EXPECT_HEAP_ALLOC);
+    Check("HeapPop",      r.HeapPop,      off::EXPECT_HEAP_POP);
+    Check("LayoutLoad",   r.LayoutLoad,   off::EXPECT_LAYOUT_LOAD);
+    Check("NetRankCtor",  r.NetRankCtor,  off::EXPECT_NETRANK_CTOR);
+    Check("NetRankBind",  r.NetRankBind,  off::EXPECT_NETRANK_BIND);
+    Check("NetRankShow",  r.NetRankShow,  off::EXPECT_NETRANK_SHOW);
+    Check("NetRankDraw",  r.NetRankDraw,  off::EXPECT_NETRANK_DRAW);
+    r.netRankOk = InImage(r.HeapPush) && InImage(r.HeapAlloc) && InImage(r.HeapPop) &&
+                  InImage(r.LayoutLoad) && InImage(r.NetRankCtor) &&
+                  InImage(r.NetRankBind) && InImage(r.NetRankShow) &&
+                  InImage(r.NetRankDraw);
+    if (!r.netRankOk) hoe::Log("  net-ranking panel unavailable (non-fatal)");
+
     // --- mission manager (diagnostics only, never fatal) ---
     if (uintptr_t tick = FindPattern(off::ANCHOR_MISSION_TICK_PATTERN)) {
         Check("MissionTick", tick, off::EXPECT_MISSION_TICK);

@@ -59,6 +59,20 @@ struct Resolved {
     uintptr_t GLayoutNames    = 0;   // POINTER to the per-slot name table
     bool      layoutDiagOk    = false;
 
+    // The network-ranking panel: pjs_net_ranking is the layout the deleted
+    // src/ranking code drove, and it still ships. The sibling widget that draws
+    // the minigame version of the same panel is intact, so these are the pieces
+    // needed to build it ourselves. Optional; `ok` does not depend on them.
+    uintptr_t HeapPush          = 0;   // PushHeap(heapId, 0)
+    uintptr_t HeapAlloc         = 0;   // operator new(size)
+    uintptr_t HeapPop           = 0;   // PopHeap()
+    uintptr_t LayoutLoad        = 0;   // LoadLayout(obj, name, noTextures)
+    uintptr_t NetRankCtor       = 0;   // zeroes the 0x28 panel
+    uintptr_t NetRankBind       = 0;   // binds panes once the csb has loaded
+    uintptr_t NetRankShow       = 0;   // Show(group, on)
+    uintptr_t NetRankDraw       = 0;   // draws the stored int as %d
+    bool      netRankOk         = false;
+
     // pattern: sub_3A46D0(screen, variant, holdFrames) - the result-variant
     // setter the deleted src/ranking code called. Without it screen 220
     // constructs but its draw gate at +0x1C0 stays 0 and it renders nothing.

@@ -123,6 +123,13 @@ void WriteDefaults(const char* p) {
         ";  black; it now uses a mode that targets alpha 0.)\n"
         ";  Diagnostic aid - the black background is correct in the original game.\n"
         "ForceFadeIn=0\n"
+        "\n;  1 = rebuild the real end-of-mode panel on the engine's own\n"
+        ";  pjs_net_ranking layout - the one the deleted src/ranking code drew.\n"
+        ";  The title, the labels and the artwork all still ship on PC; only the\n"
+        ";  board name and the two numbers were lost, and this mod already tracks\n"
+        ";  latest and best locally.\n"
+        ";  0 = do not build it. The mode still ends cleanly either way.\n"
+        "NetRankingPanel=1\n"
         "\n[Modes]\n"
         ";  1 = show all of Bob's House of Extras rows, not just Battle King.\n"
         ";  The other rows are gated on save flags the game sets from DLC\n"
@@ -170,6 +177,7 @@ Settings Load() {
     s.UnlockAllModes   = GetPrivateProfileIntA("Modes",   "UnlockAllModes",   s.UnlockAllModes,   p);
     s.DiagMissionWatch = GetPrivateProfileIntA("Modes",   "DiagMissionWatch", s.DiagMissionWatch, p);
     s.RecapFreeze      = GetPrivateProfileIntA("Modes",   "RecapFreeze",      s.RecapFreeze,      p);
+    s.NetRankingPanel  = GetPrivateProfileIntA("Results", "NetRankingPanel",  s.NetRankingPanel,  p);
 
     // An unvalidated id indexes the screen-slot array (mainMgr + 0x1E8 + id*8).
     // slot(311) lands exactly on mainMgr+0xBA0, so 310 is the hard ceiling.
