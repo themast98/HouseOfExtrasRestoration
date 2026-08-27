@@ -178,3 +178,55 @@ layout including drawing ones, so it is suggestive at best, not evidence.
    it rather than inferring from element flags.
 3. Only then consider whether `pjs_net_ranking.par` needs an explicit texture
    load, using the single call site of `sub_482780` as the model.
+
+
+## Phase 1 (2026-08-26): the element level is CLEARED
+
+### 1a. The collect filter, read from the consumer
+
+`sub_488E00` walks the list at `0x1980D70` in three passes, following
+`elem+0x8` as the next pointer. The general pass is:
+
+```asm
+movzx eax, byte [rbx+0x2b] ; sub al,2 ; cmp al,1 ; jbe skip   ; 0x2b must not be 2 or 3
+test  byte [rbx+0x2c], 1   ; je skip                          ; bit0 must be set
+mov   rcx, rbx ; call sub_48A210                              ; == return elem[0xBC]
+test  eax, eax ; je collect                                   ; suppress 0 -> COLLECT
+test  dword [rbx+0x2c], 0x400 ; je skip                       ; only for SUPPRESSED ones
+mov   rbx, [rbx+8]                                            ; next
+```
+
+Our element has `0x2b = 0`, bit0 set and `+0xBC = 0`, so it satisfies every
+condition and IS collected. Bit `0x400` only matters for suppressed elements,
+so it is irrelevant here despite looking important at first.
+
+**Therefore the failure is strictly downstream of collection, in rasterising
+the pane tree.** That is established by reading the consumer, not inferred from
+a sibling - which is the mistake that produced the previous three wrong
+theories.
+
+Note `sub_48C050` is only 0x20 bytes and is NOT the rasteriser; that link in
+the earlier analysis chain was wrong.
+
+### 1b. Reference: what a DRAWING pane looks like
+
+Captured live from three elements that were visibly drawing (pause menu),
+saved to `refs/drawing_pane_reference.json`. Consistent shape:
+
+| offset | value | note |
+|---|---|---|
+| +0x000 | `0x18003F` / `0x3F` | flags; low 6 bits always set |
+| +0x008 | pointer | non-null |
+| +0x010 | pointer | non-null |
+| +0x018 | float ~22000-23500 | a running time |
+| +0x058 | `0x7B` | constant across all three |
+| +0x060, +0x068 | `1.0f` | scale/alpha |
+| +0x070, +0x078 | `-1` | |
+| +0x098 | pointer | non-null |
+| +0x0A0 | pointer or 0 | sibling |
+
+### Phase 2 (needs one frozen run)
+
+Diff our pane root (`elem+0x30`) against that table, read-only. Expected
+discriminators, in order: a null `+0x008`/`+0x010`/`+0x098`, low flag bits
+clear at `+0x000`, or zero scale/alpha at `+0x060`/`+0x068`.
