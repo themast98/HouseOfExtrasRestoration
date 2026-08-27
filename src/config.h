@@ -16,7 +16,8 @@ struct Settings {
     int UnlockAllModes   = 1;   // show all of Bob's rows, not just Battle King
     int DiagMissionWatch = 1;   // log the running macro + step; names any hang
     int RecapFreeze      = 0;   // hold the recap on screen and open a command channel
-    int NetRankingPanel  = 1;   // rebuild the real recap on the pjs_net_ranking layout
+    int NetRankingPanel  = 0;   // OFF: reusing the minigame widget on this layout
+                                // crashes. See netrank.cpp before re-enabling.
 };
 const Settings& Get();   // reads HouseOfExtras.ini once, writes defaults if absent
 }
