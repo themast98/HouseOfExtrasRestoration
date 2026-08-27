@@ -65,3 +65,71 @@ Three dynamic strings:
   dereferences that slot without a null check.
 * Screen field offsets are per-class; probing an unrecognised class is
   meaningless even where it is in bounds.
+
+
+## The PS3 owner (found 2026-08-26)
+
+Looking for the class that ORIGINALLY owned this layout - rather than modelling
+on the surviving minigame look-alike - is what unstuck this.
+
+Finding the reference took a corrected scanner: SN Systems forms the low half of
+an address with `addic` (opcode 12), not just `addi`/`ori`. Every earlier xref
+tool accepted only `addi`/`ori` and therefore reported ZERO references to
+strings that are demonstrably referenced.
+
+`pjs_net_ranking` (VA 0xEEA750) is referenced exactly once, at 0x006971DC:
+
+```
+0x697008   (function start)
+  ...
+  bl   0x41ca18            TransitionSetup(mission, 0, kFloat, .., 0)
+  li   r3, 0xa
+  bl   0x10604             PushHeap(10, 0)
+  li   r3, 0x118
+  bl   0x107ec             operator new(0x118)      # PC equivalent: 0x128
+  lis  r4, 0xef
+  addic r4, r4, -0x58b0    r4 = "pjs_net_ranking"
+  li   r5, 0
+  bl   0x191970            LoadLayout(mem, name, 0)
+  stw  r3, 0x1b0(r31)      <<< this->[0x1B0] = layout
+  ...
+  bl   0x106a4             PopHeap()
+```
+
+**The layout goes in `+0x1B0` - the STANDARD layout field**, the same one
+`CActionSurvivalCaption` uses. The owner is an ordinary action drawn by the
+engine's normal machinery; it never had a bespoke widget. Reusing the minigame
+widget was the wrong shape from the start, and its unguarded pane walk is what
+crashed the game twice.
+
+The owner lives in **screen slot 233** on PS3 (`mainMgr+0x580`, slot base 0x1DC,
+4-byte pointers). The step handler that opens it is 0x0043EE14, and the
+descriptor immediately after it is the matching waiter:
+
+```
+r4 = g_mainMgr[0x580]          ; slot 233
+cmpwi r4, 0 ; bne skip
+li r4, 0x16 ; bl SetNextStep   ; then step 0x16
+```
+
+PC screen id 233 is `CActFaceSpecialFileManager` - the ids are renumbered and
+the net-ranking class is absent from PC's factory table, so there is nothing to
+open directly.
+
+## Revised plan: borrow a working owner
+
+Since the owner is just "an action with a layout at +0x1B0", use one that still
+exists and is known safe, rather than reconstructing one:
+
+1. Load `pjs_net_ranking` ourselves (already proven to work).
+2. Wait until `g_layoutRes[slot].count > 0`, then build pages once.
+3. **Check page 0 and its element are non-null before anything touches them.**
+4. `OpenScreen(mgr, 220, arg3)` - the caption action, repeatedly exercised
+   without a crash - and wait for its `+0x1A8` to become 1 so its own load
+   (which loops pages 0..3) has already finished on ITS layout.
+5. Swap `screen[0x1B0]` to our layout.
+6. `sub_3A46D0(screen, 0, hold)` - opens the draw gate and plays page 0's
+   in-animation on our layout.
+
+Every dereference in that path is checkable in advance, which the previous two
+attempts were not.
