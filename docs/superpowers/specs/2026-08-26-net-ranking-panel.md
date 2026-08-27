@@ -133,3 +133,48 @@ exists and is known safe, rather than reconstructing one:
 
 Every dereference in that path is checkable in advance, which the previous two
 attempts were not.
+
+
+## Live results (2026-08-26): builds cleanly, does not rasterise
+
+First run that neither crashed nor hung. The whole lifecycle works:
+
+```
+netrank: layout=... slot=16 ('pjs_net_ranking')
+netrank: built after 2 frames, 17 pages, all elements present
+netrank: page 0 unsuppressed
+netrank: released layout ... (slot 16)     <- teardown clean, game survived
+```
+
+17 pages confirms the crash diagnosis exactly: that count is what overflowed
+the 0x28-byte panel of the minigame widget.
+
+**Ruled out live, with the panel frozen on screen:**
+
+* Not the fade. State byte 0 and alpha 0.0 - no overlay at all this time.
+* Not the renderer being idle. The d-pad element draws in the same frame.
+* Not `elem[0x68]` / `sub_48BB90`. Every element in the global list has
+  `+0x68 == NULL`, **including ones that are visibly drawing**, so it was never
+  the discriminator.
+* Not element flags. Live drawing elements read `0x51`/`0x71` while ours read
+  `0x4B`; setting ours to `0x51` changed nothing.
+* Not page selection. Unsuppressing ALL 17 pages and flagging every element
+  `0x51` still rendered nothing.
+* Not the element list. 236 elements registered, ours among them.
+
+So the elements are registered, unsuppressed and flagged exactly like elements
+that do draw, and still produce no pixels. The remaining candidates are below
+the element: the pane tree, its textures, or its geometry.
+
+`g_layoutTexPar[16]` is NULL for our layout - but that is true of every live
+layout including drawing ones, so it is suggestive at best, not evidence.
+
+**Next avenues, in order of expected value:**
+
+1. Compare our element's PANE TREE (`elem+0x30`) against a drawing element's -
+   pane count, flags, and whether any pane has a resolved texture handle.
+2. Find what the render walk (`sub_488E00` -> `sub_48BC70` -> `sub_48C050`)
+   actually requires of a pane before it emits geometry, and check ours against
+   it rather than inferring from element flags.
+3. Only then consider whether `pjs_net_ranking.par` needs an explicit texture
+   load, using the single call site of `sub_482780` as the model.
