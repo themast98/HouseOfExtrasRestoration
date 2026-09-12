@@ -78,11 +78,10 @@ dist/         player-facing README; release packages are built here (not committ
 - Diagnostics are disabled, never deleted.
 
 ## Credits
-
-- Themast: research, design and implementation.
-- SRMM-Studio for Shin Ryu Mod Manager and Parless.
-- The Like A Brawler team, whose released code showed the patch and settings
-  patterns this project started from.
+- [SRMM-Studio](https://github.com/SRMM-Studio/ShinRyuModManager) for Shin Ryu Mod Manager and Parless.
+- [Jhrino](https://github.com/Fronkln), whose released code showed the patch and settings
+  patterns this project started from and just being a great inspiration.
+- Infinitus Wealthus, who helped retrieving english assets from the original PS3 Version
 
 ## License
 
