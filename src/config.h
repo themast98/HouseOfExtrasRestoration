@@ -16,7 +16,8 @@ struct Settings {
                                 // engine's own shape - wait for the player, with
                                 // no clock - is the correct behaviour.
     int DiagScreenState  = 0;   // log the result screen's own state each second
-    int CallTransitionSetup = 1; // mirror the reference handler's fade call
+    int CallTransitionSetup = 0; // stock-result path only (ShowResultScreen=1); the
+                                 // validated PS3-parity ini runs with it off
     int ForceFadeIn      = 0;   // after opening, fade the screen back IN (test aid)
     int UnlockAllModes   = 1;   // show all of Bob's rows, not just Battle King
     int DiagStartup      = 0;       // log the ~3s window after the patches install.
@@ -37,7 +38,13 @@ struct Settings {
                                 // is ever missed with this at 0, the panel holds
                                 // forever and the player is stuck - set it to 3600
                                 // to get the escape hatch back.
-    int NetRankingPanel  = 0;   // OFF: reusing the minigame widget on this layout
+    int NetRankingPanel  = 1;   // the NETWORK RANKING panel after Battle King /
+                                // Fastest Killer. Was 0 while the panel still went
+                                // through the minigame widget (which crashed); the
+                                // panel has built its own pages since and this is
+                                // the value every mode was validated with. A fresh
+                                // install writes the ini FROM these defaults, so a
+                                // stale 0 here silently switched the panel off.
     int ResetExtrasFlags = 1;   // replay Bob's post-match flag reset so a completed
                                 // mode can be started again (see ResetExtrasStartFlags)
     int PanelHideTimeLabel = 1;     // hide page-0 pane 0x22 ("Time") - Battle King is a score mode
@@ -206,7 +213,8 @@ struct Settings {
     int PanelTextPrio    = 0x0800;  // ctx+0xD7C - glyph sort priority, below the panel
     int DiagTextBind     = 0;       // log what TextBind established, per slot
     int PanelSortBias    = 0x1000;  // elem+0x4C; must land below the 0x3000 black quad
-    int PanelDirectDraw  = 1;   // draw the panel ourselves each frame, as the HUD does
+    int PanelDirectDraw  = 0;   // 0 in the validated ini. Read and logged only; the
+                                // engine's own element walk draws the panel.
     int DiagMissionTrace = 0;   // trace the mission manager after a run
     int DiagFlagsOnly    = 0;   // 1 = only LOG which start flags are stuck, clear nothing
                                 // crashes. See netrank.cpp before re-enabling.
