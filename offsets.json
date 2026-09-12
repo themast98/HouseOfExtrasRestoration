@@ -62,6 +62,10 @@
           "slot": 63,
           "expect_rva": "0xB60940",
           "space": 16
+        },
+        "MODE_TEARDOWN": {
+          "slot": 10,
+          "expect_rva": "0xB58EE0"
         }
       }
     },
@@ -81,11 +85,32 @@
     "ACTION_COLOSSEUM_EXTRA": {
       "type_name": ".?AVCActionColosseumExtra@@",
       "slots": {}
+    },
+    "ACTION_DRAW_2D": {
+      "type_name": ".?AVCActionDraw2D@@",
+      "slots": {
+        "DRAW_2D_PASS": {
+          "slot": 7,
+          "expect_rva": "0x2B7BB0"
+        }
+      }
+    },
+    "ADVENTURE_SURVIVE": {
+      "comment": "CMissionMacroAdventureSurvive - the macro behind BOTH Survival Tag rows (offline 332:6 and ranking 199:1, mission 304). Needed only so the flag reset can recognise a tag run ending; no slots are hooked.",
+      "type_name": ".?AVCMissionMacroAdventureSurvive@@",
+      "expect_vtable_rva": "0x13819A0",
+      "slots": {}
+    },
+    "ADVENTURE_ESCAPE": {
+      "comment": "CMissionMacroAdventureEscape - Extra Chase / Speed King. Slot 88 is the end-of-mission virtual whose ranking branch Sega deleted; the mod patches that SLOT (never the function - eleven vtable entries share +0xB56860). Its slots 62/63 look gutted but are shared base-class no-ops that this macro never enters.",
+      "type_name": ".?AVCMissionMacroAdventureEscape@@",
+      "expect_vtable_rva": "0x1375028",
+      "slots": {}
     }
   },
   "constants": {
     "SCREEN_RESULT": 220,
-    "STEP_2D": 45,
+    "STEP_2D": "0x2D",
     "STEP_2E": 46,
     "ACTION_OFFSET": "0xBA0",
     "KILL_COUNT_OFFSET": "0x208",
@@ -135,7 +160,122 @@
     "SCREEN_ID_CAPTION": 220,
     "SCREEN_ID_BATTLE_RESULT": 222,
     "SCREEN_ID_ONIGOKKO_RESULT": 223,
-    "SCREEN_ID_TOUGIJYO_RESULT": 225
+    "SCREEN_ID_TOUGIJYO_RESULT": 225,
+    "TEXT_DEFAULT_SIZE": "0x47300000",
+    "MACRO_STEP_CUR": "0x128",
+    "MACRO_STEP_PENDING": "0x12C",
+    "MGR_SUSPEND_FLAGS": "0x10C8",
+    "MGR_SUSPEND_PASS": "0x10CC",
+    "MGR_RENDER_LIST": "0x0BB8",
+    "MGR_RENDER_LIST_NORMAL": "0xC78",
+    "MGR_SCREEN_SLOT_BASE": "0x1E8",
+    "PAD_STATE_OFFSET": "0x16D0",
+    "PAD_MGR_ARRAY": "0x10",
+    "PAD_MGR_COUNT": "0x18",
+    "G_PAD_MGR_RVA": "0x19A0D50",
+    "G_CONFIRM_BIT_RVA": "0x19182F4",
+    "G_CANCEL_BIT_RVA": "0x19182F8",
+    "MACRO_RESULT_KIND": "0x164",
+    "STEP_TERMINAL": 0,
+    "FLAGMGR_DESC_REL": "0x2C",
+    "MISSIONMGR_REQ_ID": "0x2C",
+    "MISSIONMGR_STATE": "0x30",
+    "MISSIONMGR_CURMACRO": "0x50",
+    "MACRO_LIFECYCLE": "0x18",
+    "ELEM_NEXT_FIELD": "0x08",
+    "ELEM_PASS_FIELD": "0x2B",
+    "ELEM_SORT_KEY_FIELD": "0x4C",
+    "TEXT_CTX_PRIO_FIELD": "0xD7C",
+    "TEXT_PANE_FLAG": "0x40",
+    "TEXT_CTX_GLYPH_H": "0xD8C",
+    "TEXT_CTX_GLYPH_W": "0xDA0",
+    "TEXT_CTX_ALPHA_BYTE": "0xD83",
+    "PS3_NUMBER_GLYPH_W": "20",
+    "TEXT_CTX_FONT_BANK": "0xDAC",
+    "TEXT_CTX_METRIC_MODE": "0xDF0",
+    "FONT_PREFIX_DISP": "0x67059A",
+    "FONT_FORMAT_DISP": "0x670630",
+    "FONT_ZENKAKU_IMM": "0x6706EE",
+    "FONT_BANK_STYLE": "3",
+    "TEXT_CTX_SHEET": "0x08",
+    "TEXT_CTX_CELL_W": "0xD90",
+    "ACTION_TIMER_PTR": "0x1A8",
+    "ACTION_MODE_INDEX": "0x1B4",
+    "ACTION_TIME_MODE": "0x1B8",
+    "TIMER_FRAMES": "0x1B0",
+    "TIMER_STATE": "0x1AC",
+    "TAGHELP_SITE_ART_W": "0x72",
+    "TAGHELP_SITE_SIZE_W": "0x93",
+    "TAGHELP_SITE_POS_Y": "0xF5",
+    "TAGHELP_SITE_POS_X": "0x10A",
+    "CANVAS_W_CONST": "0x1209C9C",
+    "CANVAS_H_CONST": "0x1209C98",
+    "RECORD_BANNER_PAGE": "9",
+    "ANIM_ROLL_FRAMES": "30",
+    "MAINMGR_CHASE_TIMER": "0x7E8",
+    "CHASE_TIMER_CAP": "0x57E3F",
+    "CHASE_RANK_SLOT": "88",
+    "MODE_SPEED_KING": "8109",
+    "MAINMGR_TAG_ACTION": "0x888",
+    "MAINMGR_SURV_SCREEN": "0x8E0",
+    "TAG_MANAGER_PTR": "0x1A8",
+    "TAG_SCORE_MUL": "0x1C",
+    "TAG_SCORE_ADD": "0x18",
+    "SURVIVE_STEP2D_SLOT": "63",
+    "MODE_ENDLESS_TAG": "8110",
+    "MACRO_STEP_FIELD": "0x12C",
+    "MAINMGR_CONTINUE_OBJ": "0x3D8",
+    "MAINMGR_DT_BASE": "0x2E12F8",
+    "MAINMGR_DT_SCALE": "0x2E12F0",
+    "SURVIVE_RANK_BRANCH": "0xB561AF",
+    "TAG_MODE_FIELD": "0x8",
+    "STEAM_ACHV_CALL_NAME": "0xDFABA3",
+    "STEAM_ACHV_CALL_DESC": "0xDFABDF",
+    "STEAM_SNPRINTF_THUNK": "0x24852",
+    "STEAM_STRLEN_FAULT": "0xEFAB10",
+    "STEAM_ACHV_ARRAY": "0x1A357C0",
+    "CHASE_DRAIN_FUNC": "0x5A4810",
+    "CHASE_DRAIN_ABILITY_TEST": "0x5A482A",
+    "CHASE_DRAIN_THRESHOLD": "0x5A4851",
+    "MAINMGR_LOGIC_FRAME": "0x1C",
+    "MAINMGR_PAUSE_BITS": "0x15C",
+    "MAINMGR_PAUSE_MASK": "0x80800",
+    "SURVIVE_STEP2C_SLOT": "62",
+    "SURVIVE_STEP2C_FUNC": "0xB55520",
+    "SURVIVE_OPENSCREEN_CALL": "0xB5556A",
+    "SURVIVE_SCREEN_ID_MOV": "0xB5555E",
+    "MACRO_INTRO_DONE": "0x130",
+    "SND_CATEGORY_UI": "0x12",
+    "SE_KEY_ROLL": "0x10023",
+    "SE_KEY_SETTLE": "0x10024",
+    "SE_KEY_NEW_RECORD": "0x1000C",
+    "SE_KEY_DECIDE": "0x10001",
+    "G_MISSION_PARAMBLK": "0x1A1EC20",
+    "G_MISSION_QUEUE": "0x1A1EC10",
+    "MAINMGR_CHASE_ACTION": "0x7D0",
+    "CHASE_FLAGS_782": "0x782",
+    "CHASE_INTRO_LATCH": "0x299B70",
+    "CHASE_INTRO_BIT": "0x20",
+    "MAINMGR_START_CAPTION": "0x3E8",
+    "MAINMGR_CAPTION_HOLD": "0x988",
+    "CAPTION_SUB_TEX": "0x1A8",
+    "CAPTION_TITLE_TEX": "0x1B0",
+    "CAPTION_LAYOUT": "0x1B8",
+    "CAPTION_FLAGS": "0x1C4",
+    "CAPTION_SUBMISSION": "0x1C8",
+    "CAPTION_PAGE": "0x1D0",
+    "CAPTION_PENDING": "0x1D4",
+    "CAPTION_AUX": "0x1D8",
+    "CAPTION_MUTE": "0x1DC",
+    "CAPTION_RESET_REQ": "0x1E0",
+    "CAPTION_KEEP": "0x1E4",
+    "CAPTION_NAME": "0x1EC",
+    "CAPTION_SET_CURRENT": "0x39E560",
+    "ESCAPE_STEP4_SLOT": "22",
+    "ESCAPE_INTRO_ENTRY_SLOT": "107",
+    "MISSION_PARAMBLK_SETUP": "0x44",
+    "G_SUBMISSION_MGR": "0x1A21CA0",
+    "SUBMISSION_CURRENT": "0xCB9A60"
   },
   "patterns": {
     "SET_RESULT_VARIANT": {
@@ -212,6 +352,91 @@
       "comment": "sub_483EB0(layout) - releases the pages through their vector-deleting destructor, which UNLINKS each element from the global render list at 0x1980D70. Without it the renderer walks freed memory.",
       "pattern": "40 53 48 83 EC 30 48 C7 44 24 20 FE FF FF FF 48 8B D9 48 8D 05 ? ? ? ? 48 89 01 48 8B 89 20 01",
       "expect_rva": "0x483EB0"
+    },
+    "IS_TEX_RESIDENT": {
+      "comment": "sub_102D750(id) -> 0/1. The gate that was discarding our panel. In sub_486920 at 0x486D79 the renderer picks the texture id from pane+0x4C, falls back to RS+0x1C, stores it in the draw command at +0x40, calls this, and on a false result jumps straight to the epilogue - AFTER sub_4889C0 has already transformed all four corners. That is why 1900x1000 sprites lit zero pixels. Pure read, one integer argument, no side effects; it rejects 0xFFFF and any id whose registry entry is null.",
+      "pattern": "48 8B 15 ? ? ? ? 8D 41 01 0F B7 C8 FF C9 3B 8A B4 18 00 00 73",
+      "expect_rva": "0x102D750"
+    },
+    "FLAG_GET": {
+      "comment": "GetFlag(flagMgr, group, bit, 1) -> int. Reads the committed bank via flagMgr->[0x990]+0xC group table. Read-only, used to LOG what is stuck.",
+      "pattern": "48 8B 81 90 09 00 00 45 33 D2",
+      "expect_rva": "0xBF60F0"
+    },
+    "FLAG_SET_RAW": {
+      "comment": "sub_BF8990(flagMgr, group, bit, value) - forces the COMMITTED bank bit. This is what the macro destructor sub_B57F40 uses; it does not touch the pending list.",
+      "pattern": "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 20 48 8B 81 90 09 00 00 41 8B F0",
+      "expect_rva": "0xBF8990"
+    },
+    "FLAG_SET_EDGE": {
+      "comment": "sub_BF8B30(flagMgr, group, bit, value) - the EDGE-TRIGGERED setter Bob's talk script calls. Maintains a 32-entry pending list at flagMgr[0]; does NOTHING when the committed bank already holds the requested value. That no-op is the entire reason a played mode cannot be restarted.",
+      "pattern": "48 89 6C 24 10 48 89 74 24 18 48 89 7C 24 20 41 56 48 83 EC 20 48 8B F9 8B EA",
+      "expect_rva": "0xBF8B30"
+    },
+    "DRAW_ELEMENT": {
+      "comment": "sub_48BC70(elem) - draws ONE layout element immediately. This is what CActionItem::vfunc+0x38 (sub_2FBAF0) calls directly every frame to put the dpad HUD on screen, bypassing the sorted global pass entirely. Our orphan layout has no owner and no draw node, so nothing calls it for us.",
+      "pattern": "48 8B C4 57 48 83 EC 70 48 C7 40 A8 FE FF FF FF 48 89 58 08 48 89 70 10",
+      "expect_rva": "0x48BC70"
+    },
+    "SET_PANE_HIDDEN": {
+      "comment": "sub_48B1B0(elem, paneId, hidden) - walks the pane tree for the u16 id at [[node+0x10]+8] and sets/clears flag bit 17 (0x20000) on that pane: +0x48B22D 'and [rax], 0xfffdffff' then +0x48B233 'shl r10d,0x11' / 'or [rax], r10d'. Bit 17 means HIDDEN - the draw gate at +0x486AB8 shifts it into state+0x34, and +0x486AE4/+0x486AF8 then skip the pane unless the force-draw bit 0x40000 is set. This is what PS3 uses at 0x69854C to pick Score vs Time (page 0, pane 0x22 = Time, 0x23 = Score).",
+      "pattern": "81 20 FF FF FD FF 41 C1 E2 11 44 09 10",
+      "offset": "-0x7D",
+      "note": "matches the TAIL at +0x48B22D, not the prologue - five functions share that prologue (sub_48AF80/48ADE0/48AEB0/48B1B0/48B260, the same tree walk with different tails). Function start = match - 0x7D.",
+      "expect_rva": "0x48B1B0"
+    },
+    "PANE_POS_REG": {
+      "comment": "sub_48AF80(elem, paneId, outBuf, 1) - registers outBuf to receive the POSITION of the pane with that id; sub_48A780 then fills it. Unlike the style registrar sub_48ADE0 this has NO flag-0x40 gate (tail at +0x48B002: and [rax],0xFFE7FFFF / shl r11d,0x14 / or / mov [rax+0x20],rbx), so it can legally read a non-text anchor pane. PS3 uses the same call (sub_197588) to find the two number anchors.",
+      "pattern": "81 20 FF FF E7 FF",
+      "offset": "-0x82",
+      "note": "tail-anchored: five functions share this prologue byte for byte",
+      "expect_rva": "0x48AF80"
+    },
+    "PANE_EVAL": {
+      "comment": "sub_48A780(elem) - evaluates the pane tree and fills every buffer registered by sub_48AF80 / sub_48ADE0 / sub_48AEB0. TextBind calls it at +0x484926 and again at +0x484A4E.",
+      "pattern": "C8 C5 78 29 48 B8 C5 78 29 50 A8 C5 78 29 58 98 C5 78 29 60 88 E8 5E",
+      "offset": "-0x1C",
+      "note": "anchored inside the body - the prologue has two copies",
+      "expect_rva": "0x48A780"
+    },
+    "FONT_STYLE_OPEN": {
+      "comment": "sub_6708E0(ctx, style) - sets ctx+0xD6C = style and, when style is nonzero, loads that style's face into font BANK 1 via sub_670520(ctx, -1, 1, 0), then tail-calls sub_670A70(ctx, 0). Pairs with FONT_STYLE_CLOSE; the loader overwrites the bank's globals without releasing, so the two must balance.",
+      "pattern": "40 53 48 83 EC 20 89 91 6C 0D 00 00 48 8B D9 85 D2",
+      "note": "the `mov [rcx+0xD6C], edx` in the prologue makes this unique in .text",
+      "expect_rva": "0x6708E0"
+    },
+    "FONT_STYLE_CLOSE": {
+      "comment": "sub_66F200(ctx) - releases bank 1's resources and resets ctx+0xD6C to 0.",
+      "pattern": "40 53 48 83 EC 20 48 8B D9 E8 B5 29 9D FF BA 01 00 00 00 48 8B CB",
+      "note": "the bare prologue occurs 4 times; the two relative calls disambiguate it",
+      "expect_rva": "0x66F200"
+    },
+    "TAGHELP_DRAW": {
+      "comment": "CActionSurvivalTagHelp::Draw - the survival-tag Controls panel. Anchored on the two vmulss that scale the art (x512 then x1/2048), which is the only place in the image with this byte sequence.",
+      "pattern": "C5 FA 59 0D FD 22 62 00 C5 72 59 05 71 BD 79 00",
+      "note": "matches at +0xBFBFB3, inside the function; entry = match - 0x83",
+      "offset": "-0x83",
+      "expect_rva": "0xBFBF30"
+    },
+    "SND_PLAY": {
+      "comment": "SndPlay(key=(bank<<16)|cue, int* outHandle /*nullable*/, flags, category) -> handle. The UI sound entry point: 1447 callers, r9d=0x12 for UI. Early-outs on a 'sound system ready' byte, hence the rip-relative cmp, which is wildcarded.",
+      "pattern": "44 89 44 24 18 41 55 41 56 48 83 EC 58 80 3D ? ? ? ? 00 4C 8B EA 44 8B F1",
+      "expect_rva": "0xCD9580"
+    },
+    "SND_STOP": {
+      "comment": "SndStop(handle, fadeFrames). Shares its prologue byte-for-byte with +0xCD8CA0 and +0xCD9F10, so the rip displacement of its voice-table lea is kept literal to make the match unique - it is as build-specific as expect_rva.",
+      "pattern": "48 89 5C 24 10 89 4C 24 08 57 48 83 EC 20 0F B6 C1 48 8D 3D 68 63 D5 00 48 C1 E0 07",
+      "expect_rva": "0xCDA8E0"
+    },
+    "TALK_MATCH": {
+      "comment": "sub_BA7AA0 - the stage-pac talk matcher: (ctx, u16 out[4], talkBlock, p4). Walks the block's entry list in order, evaluates each entry's condition rows (op 3 = FlagGet(group,bit,value==0)), and stores the FIRST matching entry index per slot. Bob's post-mode lines live in entries AFTER the greetings, which is why DiagTalkMatch logs what the runtime view of the block is. The 16-byte prologue is relocatable; the detour resumes at +0x10.",
+      "pattern": "48 89 54 24 10 41 55 41 57 48 81 EC 98 00 00 00 C7 02 FF 00 FF 00 4D 8B F9 C7 42 04 FF 00 FF 00",
+      "expect_rva": "0xBA7AA0"
+    },
+    "COLO_SCENE": {
+      "comment": "sub_3927E0(stageMgr) - the coliseum scene-flag function (PS3 twin 0x6CAABC). For stage ST_TOUGI (0x66) it raises/lowers the STID_ST_TOUGI_SCNxxx flags that gate the stage's scene objects, chosen by mode. PC's tail (+0x393709) clears SCN033 (521:12, alias 1242 - the Ameba floor decal) unconditionally where PS3 keeps it; AmebaFloor post-detours it. The 16-byte prologue is relocatable; the detour resumes at +0x10 (cmp eax,0x61).",
+      "pattern": "40 53 48 83 EC 20 48 63 81 B0 01 00 00 48 8B D9 83 F8 61 77",
+      "expect_rva": "0x3927E0"
     }
   },
   "anchors": {
@@ -307,6 +532,62 @@
           "at": "0x04",
           "len": 6,
           "expect_rva": "0x1980D20"
+        }
+      }
+    },
+    "PAGE_CTOR": {
+      "comment": "sub_484260(page, slot, r8d, r9d) - the page constructor, reached from BuildPages+0x133. It is the anchor for the texture-handle helpers because both of them are tiny stubs with no unique prefix of their own. It also documents the engine's own page setup: sub_489730 makes the element, sub_48A520 selects its animation sequence, sub_48AC40 suppresses it, and then - only when g_layoutRes[slot].flags bit 3 is set - it fetches a shared texture id and stamps it into the element with sub_48B9D0. That last pair is the step we were missing: without a texture handle the renderer builds our quads and then discards them at the residency gate in sub_486920.",
+      "pattern": "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 33 C0 8B",
+      "expect_rva": "0x484260",
+      "calls": {
+        "SHARED_TEX_B": {
+          "at": "0x79",
+          "expect_rva": "0x481520"
+        },
+        "SET_TEX_HANDLE": {
+          "at": "0x84",
+          "expect_rva": "0x48B9D0"
+        },
+        "SET_ANIM_VARIANT": {
+          "comment": "sub_48A520(elem, variant, flags) - selects an element's animation sequence. With flags bit 4 the variant index is used verbatim, and when the requested variant equals the current one (+0x48A562) it SKIPS the pane-tree rebuild and only resets the clock (+0x48A594) and speed (+0x48A59D). Used to replay page 9's NEW RECORD animation.",
+          "at": "0x4B",
+          "expect_rva": "0x48A520"
+        }
+      },
+      "riprefs": {}
+    },
+    "TEXT_API": {
+      "comment": "sub_85DEC0 is the minigame ranking widget's draw, and it is the cleanest worked example of the engine's immediate-mode layout text API - which is what the panel's three dynamic strings need. It does exactly three things:\n    sub_4848C0(page, mode, 0)          position the text cursor on a layout page\n    g_textCtx[0xD7C] = 45056.0f        glyph size\n    sub_670BD0(g_textCtx, \"%d\", value) printf into it\nNo font object has to be constructed: sub_4848C0 takes a PAGE RECORD, the same 0x30-byte thing GetPage returns, and reads the element from page+0x10. It has 924 callers, so it is the standard path rather than a widget quirk. This is anchored on the widget rather than on sub_4848C0 itself because that function has no distinctive prefix, and the widget's pattern is already proven.",
+      "pattern": "40 53 48 83 EC 20 33 D2 48 8B D9 E8 ? ? ? ? 85 C0 74 38",
+      "expect_rva": "0x85DEC0",
+      "calls": {
+        "TEXT_BIND": {
+          "at": "0x1F",
+          "expect_rva": "0x4848C0"
+        },
+        "TEXT_PRINTF": {
+          "at": "0x47",
+          "expect_rva": "0x670BD0"
+        }
+      },
+      "riprefs": {
+        "G_TEXT_CTX": {
+          "at": "0x24",
+          "len": 7,
+          "expect_rva": "0x1990E80"
+        }
+      }
+    },
+    "TEX_GATE": {
+      "comment": "sub_486920+0x459 - the texture gate that decides whether a pane emits geometry: `mov eax,[pane+0x4C]; jne use; mov eax,[RS+0x1C]; IsTexResident; je skip_emit`. 0x83 bytes later, immediately after the emit call, sits `inc [g_quadCounter]`. That counter is the objective answer to 'did anything actually draw' - reading it around our own draw turns a visual judgement into a number in the log.",
+      "pattern": "8B 43 4C 85 C0 75 03 8B 47 1C 8B C8 89 46 40 E8",
+      "expect_rva": "0x486D79",
+      "calls": {},
+      "riprefs": {
+        "G_QUAD_COUNTER": {
+          "at": "0x83",
+          "len": 6,
+          "expect_rva": "0x1980D30"
         }
       }
     }

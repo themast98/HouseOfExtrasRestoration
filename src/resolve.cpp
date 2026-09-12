@@ -165,11 +165,29 @@ Resolved Build() {
     r.ActionExtraVft = FindVTable(off::TYPENAME_ACTION_COLOSSEUM_EXTRA);
     hoe::Log("  CActionColosseumExtra vft +0x%llX", (unsigned long long)r.ActionExtraVft);
 
+    // The tag modes run under their own macro, so the flag reset has to
+    // recognise it too - see game.cpp ObserveModeEnd.
+    r.AdvSurviveVft = FindVTable(off::TYPENAME_ADVENTURE_SURVIVE);
+    r.AdvEscapeVft  = FindVTable(off::TYPENAME_ADVENTURE_ESCAPE);
+    hoe::Log("  CMissionMacroAdventureEscape vft +0x%llX",
+             (unsigned long long)r.AdvEscapeVft);
+    hoe::Log("  CMissionMacroAdventureSurvive vft +0x%llX",
+             (unsigned long long)r.AdvSurviveVft);
     uintptr_t vtExtra = FindVTable(off::TYPENAME_COLOSSEUM_EXTRA);
     uintptr_t vtColos = FindVTable(off::TYPENAME_COLOSSEUM);
     if (!vtExtra || !vtColos) { hoe::Log("RTTI walk failed"); return r; }
+    r.ColosExtraVft = vtExtra;   // kept for ObserveModeEnd's macro identification
     hoe::Log("  vtable ColosseumExtra +0x%llX, Colosseum +0x%llX",
              (unsigned long long)vtExtra, (unsigned long long)vtColos);
+
+    // The 2D pass we borrow to get a render-phase draw. We want the SLOT's own
+    // address so it can be rewritten, not the function it currently points at.
+    if (uintptr_t vtDraw2D = FindVTable(off::TYPENAME_ACTION_DRAW_2D)) {
+        r.Draw2DVtableSlot = vtDraw2D + (uintptr_t)off::SLOT_DRAW_2D_PASS * 8;
+        Check("Draw2DPass", Slot(vtDraw2D, off::SLOT_DRAW_2D_PASS), off::EXPECT_DRAW_2D_PASS);
+    } else {
+        hoe::Log("  CActionDraw2D vtable not found - the draw hook will be skipped");
+    }
 
     r.Step2CStub    = Slot(vtExtra, off::SLOT_STEP_2C_STUB);
     r.Step2DStub    = Slot(vtExtra, off::SLOT_STEP_2D_STUB);
@@ -228,6 +246,52 @@ Resolved Build() {
     }
 
     r.SetResultVariant = FindPattern(off::PATTERN_SET_RESULT_VARIANT);
+    r.DrawElement = FindPattern(off::PATTERN_DRAW_ELEMENT);
+    // Three pane-tree helpers. All are TAIL- or body-anchored because five
+    // functions in this family share their prologue byte for byte; the backup
+    // distances are declared alongside the patterns in offsets.json.
+    if (uintptr_t tail = FindPattern(off::PATTERN_SET_PANE_HIDDEN)) {
+        r.SetPaneHidden = tail - 0x7D;
+        Check("SetPaneHidden", r.SetPaneHidden, off::EXPECT_SET_PANE_HIDDEN);
+    }
+    if (uintptr_t tail = FindPattern(off::PATTERN_PANE_POS_REG)) {
+        r.PanePosReg = tail - 0x82;
+        Check("PanePosReg", r.PanePosReg, off::EXPECT_PANE_POS_REG);
+    }
+    if (uintptr_t mid = FindPattern(off::PATTERN_PANE_EVAL)) {
+        r.PaneEval = mid - 0x1C;
+        Check("PaneEval", r.PaneEval, off::EXPECT_PANE_EVAL);
+    }
+    if (uintptr_t mid = FindPattern(off::PATTERN_TAGHELP_DRAW)) {
+        r.TagHelpDraw = mid - 0x83;   // the anchor sits inside the function
+        Check("TagHelpDraw", r.TagHelpDraw, off::EXPECT_TAGHELP_DRAW);
+    }
+    r.FontStyleOpen  = FindPattern(off::PATTERN_FONT_STYLE_OPEN);
+    Check("FontStyleOpen",  r.FontStyleOpen,  off::EXPECT_FONT_STYLE_OPEN);
+    // The recap's sounds. Non-fatal: the panel is complete without them, and a
+    // missing resolve just means silence plus a log line, exactly as before.
+    r.SndPlay        = FindPattern(off::PATTERN_SND_PLAY);
+    Check("SndPlay",        r.SndPlay,        off::EXPECT_SND_PLAY);
+    r.SndStop        = FindPattern(off::PATTERN_SND_STOP);
+    Check("SndStop",        r.SndStop,        off::EXPECT_SND_STOP);
+    r.TalkMatch      = FindPattern(off::PATTERN_TALK_MATCH);   // diagnostics only
+    Check("TalkMatch",      r.TalkMatch,      off::EXPECT_TALK_MATCH);
+    r.ColoScene      = FindPattern(off::PATTERN_COLO_SCENE);
+    Check("ColoScene",      r.ColoScene,      off::EXPECT_COLO_SCENE);
+    r.FontStyleClose = FindPattern(off::PATTERN_FONT_STYLE_CLOSE);
+    Check("FontStyleClose", r.FontStyleClose, off::EXPECT_FONT_STYLE_CLOSE);
+    r.FlagGet     = FindPattern(off::PATTERN_FLAG_GET);
+    r.FlagSetRaw  = FindPattern(off::PATTERN_FLAG_SET_RAW);
+    r.FlagSetEdge = FindPattern(off::PATTERN_FLAG_SET_EDGE);
+
+    // The emitted-quad counter, read via the texture gate that guards the emit.
+    if (uintptr_t gate = FindPattern(off::ANCHOR_TEX_GATE_PATTERN)) {
+        r.QuadCounter = ReadRipRef(gate + off::RIPAT_G_QUAD_COUNTER,
+                                   off::RIPLEN_G_QUAD_COUNTER);
+        Check("QuadCounter", r.QuadCounter, off::EXPECT_G_QUAD_COUNTER);
+    } else {
+        hoe::Log("texture gate not found - emitted-quad counter unavailable");
+    }
     Check("SetResultVariant", r.SetResultVariant, off::EXPECT_SET_RESULT_VARIANT);
     if (!r.SetResultVariant) {
         hoe::Log("result-variant setter not found - the screen would render nothing");
@@ -332,6 +396,56 @@ Resolved Build() {
                   InImage(r.HeapFree) && InImage(r.LayoutRelease) &&
                   InImage(r.GLayoutSlotCount);
     if (!r.netRankOk) hoe::Log("  net-ranking panel unavailable (non-fatal)");
+
+    // --- the texture-residency gate (optional; see resolve.h) ---
+    r.IsTexResident = FindPattern(off::PATTERN_IS_TEX_RESIDENT);
+    Check("IsTexResident", r.IsTexResident, off::EXPECT_IS_TEX_RESIDENT);
+    if (uintptr_t ctor = FindPattern(off::ANCHOR_PAGE_CTOR_PATTERN)) {
+        Check("PageCtor", ctor, off::EXPECT_PAGE_CTOR);
+        r.PageCtor     = ctor;
+        r.SharedTexB   = ReadCall(ctor + off::CALLAT_SHARED_TEX_B);
+        r.SetTexHandle = ReadCall(ctor + off::CALLAT_SET_TEX_HANDLE);
+        Check("SharedTexB",   r.SharedTexB,   off::EXPECT_SHARED_TEX_B);
+        Check("SetTexHandle", r.SetTexHandle, off::EXPECT_SET_TEX_HANDLE);
+        r.SetAnimVariant = ReadCall(ctor + off::CALLAT_SET_ANIM_VARIANT);
+        Check("SetAnimVariant", r.SetAnimVariant, off::EXPECT_SET_ANIM_VARIANT);
+
+        // The two shared-id getters are adjacent 7-byte `mov eax,[rip+d]; ret`
+        // stubs in the same aligned block, and neither has a prefix unique
+        // enough to pattern-match on its own. Deriving the sibling by offset is
+        // only safe if it still looks like that stub, so check the opcode
+        // rather than trusting the layout.
+        const uintptr_t sib = r.SharedTexB + 0x20;
+        const unsigned char* p = (const unsigned char*)(hoe::Base() + sib);
+        if (InImage(sib) && p[0] == 0x8B && p[1] == 0x05) {
+            r.SharedTexA = sib;
+        } else {
+            hoe::Log("  SharedTexA: +0x20 from SharedTexB is not a mov/ret stub "
+                     "(%02X %02X) - skipping that fallback", p[0], p[1]);
+        }
+    }
+    r.texGateOk = InImage(r.IsTexResident) && InImage(r.SetTexHandle) &&
+                  InImage(r.SharedTexB);
+    if (!r.texGateOk) {
+        hoe::Log("  texture gate helpers unavailable - the panel will build but "
+                 "stay invisible (non-fatal)");
+    }
+
+    // --- the layout text API (optional; see resolve.h) ---
+    if (uintptr_t td = FindPattern(off::ANCHOR_TEXT_API_PATTERN)) {
+        Check("TextApiAnchor", td, off::EXPECT_TEXT_API);
+        r.TextBind   = ReadCall(td + off::CALLAT_TEXT_BIND);
+        r.TextPrintf = ReadCall(td + off::CALLAT_TEXT_PRINTF);
+        r.GTextCtx   = ReadRipRef(td + off::RIPAT_G_TEXT_CTX, off::RIPLEN_G_TEXT_CTX);
+        Check("TextBind",   r.TextBind,   off::EXPECT_TEXT_BIND);
+        Check("TextPrintf", r.TextPrintf, off::EXPECT_TEXT_PRINTF);
+        Check("GTextCtx",   r.GTextCtx,   off::EXPECT_G_TEXT_CTX);
+    }
+    r.textOk = InImage(r.TextBind) && InImage(r.TextPrintf) && InImage(r.GTextCtx);
+    if (!r.textOk) {
+        hoe::Log("  layout text API unavailable - the panel will draw its "
+                 "artwork but no dynamic strings (non-fatal)");
+    }
 
     // --- mission manager (diagnostics only, never fatal) ---
     if (uintptr_t tick = FindPattern(off::ANCHOR_MISSION_TICK_PATTERN)) {

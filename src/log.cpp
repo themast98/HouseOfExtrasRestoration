@@ -8,11 +8,11 @@ namespace hoe {
 
 static const char* kLeaf = "HouseOfExtras.log";
 
-// Next to the game exe, so the log is always where the ini and records are.
+// Next to the .asi in the mod folder, so the log is always where the ini and records are.
 // It used to be a bare relative name, which lands wherever the working
 // directory happens to point - fine under Steam, confusing anywhere else.
 static const char* LogPath() {
-    const char* p = ExeRelative(kLeaf);
+    const char* p = ModRelative(kLeaf);
     return p ? p : kLeaf;
 }
 

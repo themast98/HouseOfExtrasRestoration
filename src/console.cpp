@@ -2,6 +2,7 @@
 #include "paths.h"
 #include "log.h"
 #include "game.h"
+#include "netrank.h"
 #include "offsets.h"
 #include "patch.h"   // hoe::Base / hoe::ImageSize
 
@@ -134,6 +135,106 @@ void Execute(char* line) {
         DoCall(Hex(tok[1]),
                n > 2 ? Hex(tok[2]) : 0, n > 3 ? Hex(tok[3]) : 0,
                n > 4 ? Hex(tok[4]) : 0, n > 5 ? Hex(tok[5]) : 0);
+    } else if (!strcmp(tok[0], "nr") && n >= 2) {
+        // Rebuilding the panel in place. Without this, every experiment costs a
+        // full Battle King run, because the panel is only ever constructed on
+        // the way through step 0x2C. The frozen recap already calls
+        // netrank::Ready() and Show() once per frame, so tearing the panel down
+        // and re-opening it here is enough for the existing loop to rebuild it
+        // from scratch - one run then yields unlimited iterations.
+        if (NeedGameThread("nr")) return;
+        if (!strcmp(tok[1], "close")) {
+            netrank::Close();
+            Out("  netrank: closed (open=%d)", (int)netrank::IsOpen());
+        } else if (!strcmp(tok[1], "reopen")) {
+            netrank::Close();
+            const bool ok = netrank::Open();
+            Out("  netrank: reopen -> %s; the recap loop will build and show it "
+                "over the next frames", ok ? "open" : "FAILED");
+        } else if (!strcmp(tok[1], "state")) {
+            Out("  netrank: open=%d failed=%d", (int)netrank::IsOpen(),
+                (int)netrank::Failed());
+        } else if (!strcmp(tok[1], "keep") || !strcmp(tok[1], "nokeep")) {
+            const bool on = !strcmp(tok[1], "keep");
+            netrank::SetKeepOpen(on);
+            Out("  netrank: keep-open %s%s", on ? "ON" : "off",
+                on ? " - send `resume` and the panel should follow you out of "
+                     "the recap into the palace, where 2D definitely composites"
+                   : "");
+        } else if (!strcmp(tok[1], "text") && n >= 6) {
+            // nr text <slot> <page> <modeHex> <0|1>
+            const int slot = (int)Hex(tok[2]);
+            const int page = (int)Hex(tok[3]);
+            const int mode = (int)Hex(tok[4]);
+            const bool on  = Hex(tok[5]) != 0;
+            if (!netrank::SetTextSlot(slot, page, mode, on)) {
+                Out("ERR nr text: slot must be 0 (board) 1 (latest) 2 (best)");
+            } else {
+                Out("  slot %d -> page %d mode %#x %s", slot, page, mode, on ? "ON" : "off");
+            }
+        } else if (!strcmp(tok[1], "prio") && n >= 3) {
+            netrank::SetDrawPriority((int)(long long)Hex(tok[2]));
+            Out("  draw priority stamped - see the log");
+        } else if (!strcmp(tok[1], "elems") && n >= 4) {
+            netrank::LogElementList(Hex(tok[2]), Hex(tok[3]));
+            Out("  element list written to the log");
+        } else if (!strcmp(tok[1], "open")) {
+            netrank::RequestOpen();
+            Out("  queued: open the panel here (serviced on the game thread)");
+        } else if (!strcmp(tok[1], "shut")) {
+            netrank::RequestClose();
+            Out("  queued: close the panel");
+        } else if (!strcmp(tok[1], "publish")) {
+            netrank::RequestPublish();
+            Out("  queued: republish resolved texture ids to pane+0x4C");
+        } else if (!strcmp(tok[1], "hide") && n >= 5) {
+            netrank::HidePane((int)Hex(tok[2]), (unsigned short)Hex(tok[3]),
+                              Hex(tok[4]) != 0);
+            Out("  pane visibility queued - see the log");
+        } else if (!strcmp(tok[1], "close") && n >= 3) {
+            netrank::ShowClosePrompt(Hex(tok[2]) != 0);
+            Out("  close prompt toggled - see the log");
+        } else if (!strcmp(tok[1], "page") && n >= 4) {
+            netrank::ShowPage((int)Hex(tok[2]), Hex(tok[3]) != 0);
+            Out("  page visibility changed - see the log");
+        } else if (!strcmp(tok[1], "font") && n >= 6) {
+            // DECIMAL here, unlike the other verbs - -1 is a meaningful value
+            // and these are all small numbers where hex would only mislead.
+            netrank::SetNumberFont(atoi(tok[2]), atoi(tok[3]), atoi(tok[4]),
+                                   atoi(tok[5]), n >= 7 ? atoi(tok[6]) : -1);
+            Out("  glyph fields overridden - watch the panel and the log");
+        } else if (!strcmp(tok[1], "fonttab")) {
+            netrank::LogFontTables();
+            Out("  per-bank glyph tables written to the log");
+        } else if (!strcmp(tok[1], "panes") && n >= 3) {
+            netrank::LogPanes((int)Hex(tok[2]));
+            Out("  pane census written to the log");
+        } else if (!strcmp(tok[1], "texgate")) {
+            netrank::LogTextureGate();
+            Out("  texture-residency numbers written to the log");
+        } else if (!strcmp(tok[1], "slots")) {
+            netrank::LogTextSlots();
+            Out("  text slot table written to the log");
+        } else if (!strcmp(tok[1], "name")) {
+            // The board name has spaces in it ("Battle King Ranking"), and
+            // strtok has already cut the line into words, so put it back
+            // together from token 2 onwards rather than taking tok[2] alone.
+            char joined[64] = {};
+            size_t len = 0;
+            for (int i = 2; i < n && len < sizeof(joined) - 1; ++i) {
+                if (len) joined[len++] = ' ';
+                for (const char* q = tok[i]; *q && len < sizeof(joined) - 1; ++q) {
+                    joined[len++] = *q;
+                }
+            }
+            joined[len] = 0;
+            netrank::SetBoardName(joined);
+            Out("  board name -> '%s'", joined);
+        } else {
+            Out("ERR nr: expected close | reopen | state | keep | nokeep | "
+                "text <slot> <page> <modeHex> <0|1> | slots | name <text> | "
+                "prio <hex> | elems <headRva> <countRva>");
+        }
     } else if (!strcmp(tok[0], "slots")) {
         game::LogAllLayoutSlots("console");
         Out("  slot dump written to the log");
@@ -162,8 +263,8 @@ void Pump(bool allowMutation) {
     struct Unlock { ~Unlock() { InterlockedExchange(&s_busy, 0); } } unlock;
     s_allowMutation = allowMutation;
 
-    const char* cmdPath = hoe::ExeRelative("HouseOfExtras.cmd");
-    const char* repPath = hoe::ExeRelative("HouseOfExtras.reply");
+    const char* cmdPath = hoe::ModRelative("HouseOfExtras.cmd");
+    const char* repPath = hoe::ModRelative("HouseOfExtras.reply");
     if (!cmdPath || !repPath) return;
 
     FILE* f = fopen(cmdPath, "r");

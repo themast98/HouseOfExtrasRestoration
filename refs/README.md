@@ -12,7 +12,9 @@ virtual layout, so `img[0xB5C3C0]` is the byte at RVA 0xB5C3C0.
 ## Regenerating
 
 1. Launch Yakuza 4 and get to any in-game state.
-2. Run `tools/dumpmod.ps1 -ProcName Yakuza4 -OutDir refs` (from the scratchpad toolset).
+2. Dump the `Yakuza4.exe` module from the running process with any memory dumper that
+   preserves the virtual layout (x64dbg + Scylla, pe-sieve, or a few lines of
+   `ReadProcessMemory` over the module's image size) and save it as `refs/Yakuza4_dumped.bin`.
 3. Confirm it is decrypted: `.text` entropy should be ~5.9, not 8.0, and the region at
    offset 0x1000 should contain plenty of `CC` padding bytes.
 

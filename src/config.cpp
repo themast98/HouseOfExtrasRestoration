@@ -1,5 +1,6 @@
 #include "config.h"
 #include "log.h"
+#include "paths.h"
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
@@ -7,22 +8,10 @@
 namespace config {
 namespace {
 
-// Absolute path next to the game exe; GetPrivateProfile* resolves bare names
-// against the Windows directory, which is never what we want.
-const char* IniPath() {
-    static char path[MAX_PATH] = {};
-    if (!path[0]) {
-        if (!GetModuleFileNameA(nullptr, path, MAX_PATH)) { path[0] = 0; return path; }
-        char* slash = strrchr(path, '\\');
-        if (!slash) { path[0] = 0; return path; }
-        const size_t used = (size_t)(slash + 1 - path);
-        if (snprintf(slash + 1, sizeof(path) - used, "%s", "HouseOfExtras.ini")
-                >= (int)(sizeof(path) - used)) {
-            path[0] = 0;   // truncated - fall back to built-in defaults
-        }
-    }
-    return path;
-}
+// The ini lives next to HouseOfExtras.asi inside the mod folder (see paths.h).
+// GetPrivateProfile* resolves bare names against the Windows directory, so it
+// has to be an absolute path.
+const char* IniPath() { return hoe::ModRelative("HouseOfExtras.ini"); }
 
 // Written on first run so users get a documented file to edit, the way
 // Like A Brawler 8's IniSettings.Write() does.
@@ -96,10 +85,13 @@ void WriteDefaults(const char* p) {
         ";  Retail call sites use 30, 40 and 180. Result actions time themselves.\n"
         "ResultHoldFrames=180\n"
         "\n;  Seconds to wait for you to dismiss the results screen (0-3600).\n"
-        ";  120 is far longer than anyone needs to read a recap, and guarantees the\n"
-        ";  game can never sit forever on a screen that will not close.\n"
-        ";  0 = wait indefinitely (only if you are sure the screen is dismissible).\n"
-        "ResultTimeoutSec=120\n"
+        ";  0 = wait indefinitely, which is now the default AND what the engine's\n"
+        ";  own handler does - it polls the screen slot with no clock at all.\n"
+        ";  120 was a guard from when the panel had no dismiss handling and could\n"
+        ";  strand the game. The panel has a Close prompt and a confirm button now,\n"
+        ";  so a clock would only cut the recap short while you were reading it.\n"
+        ";  Set a number here if you want the old bounded behaviour back.\n"
+        "ResultTimeoutSec=0\n"
         "\n;  1 = track best score per mode in HouseOfExtras.records\n"
         ";  The score field is CActionColosseumExtra+0x208, confirmed against runs\n"
         ";  of 3, 4 and 6 defeated enemies. Scores outside 1..9999 are rejected on\n"
@@ -110,7 +102,7 @@ void WriteDefaults(const char* p) {
         "DiagDumpFields=0\n"
         "\n;  1 = log the result screen's own state machine once a second, so we can\n"
         ";  tell whether the engine is actually updating it or it is inert.\n"
-        "DiagScreenState=1\n"
+        "DiagScreenState=0\n"
         "\n;  1 = call the transition/fade helper the reference handler calls before\n"
         ";  opening the screen. Set to 0 to test whether that fade is what leaves the\n"
         ";  display black with the screen up.\n"
@@ -147,20 +139,40 @@ void WriteDefaults(const char* p) {
         ";  every mode, including ones this mod does not patch. If any mode ever\n"
         ";  hangs, the log names the exact class and step it parked on instead of\n"
         ";  leaving you with a black screen and nothing to go on.\n"
-        "DiagMissionWatch=1\n"
+        "DiagMissionWatch=0\n"
         "\n;  1 = hold the recap on screen indefinitely and poll HouseOfExtras.cmd\n"
         ";  for commands, replying in HouseOfExtras.reply.\n"
         ";  A development aid: it makes the recap inspectable and experimentable\n"
         ";  live, instead of needing a fresh play session for every attempt.\n"
         ";  Send `resume` to let it finish normally. Leave at 0 for play.\n"
-        "RecapFreeze=0\n", f);
+        "RecapFreeze=0\n"
+        "\n;  Frames before the panel dismisses ITSELF without a button press.\n"
+        ";  0 = never, the default: hold until the player closes it, like the\n"
+        ";  engine's own handler. It is a backstop for two things a pad read cannot\n"
+        ";  guarantee - that no engine site cleared the pad edges earlier in the\n"
+        ";  same frame, and that the pad manager exists at all. If a confirm press\n"
+        ";  is ever missed with this at 0 the panel holds forever, so 3600 (~60s)\n"
+        ";  is the value to restore if that happens.\n"
+        "DismissWatchdog=0\n"
+        "ResetExtrasFlags=1\n"
+        "DiagFlagsOnly=0\n"
+        "\n;  Bob's post-mode line (\"What, done already?\" / \"Did you enjoy yourself?\").\n"
+        ";  PC never sets the two flags his talk entries test; 1 = set them at\n"
+        ";  mode end the way PS3's mode code does. 0 = leave them alone.\n"
+        "PostModeBobFlags=1\n"
+        "\n;  Ameba collaboration decal on the coliseum floor in Battle King / Fastest\n"
+        ";  Killer, as on PS3. PC's coliseum scene code clears the scene flag that\n"
+        ";  shows it; 1 = raise it again while a ranking coliseum mode is armed.\n"
+        "AmebaFloor=1\n"
+        "DiagMissionTrace=0\n"
+        "PanelDirectDraw=1\n", f);
     fclose(f);
 }
 
 Settings Load() {
     Settings s;
     const char* p = IniPath();
-    if (!p[0]) { hoe::Log("config: could not build ini path, using built-in defaults"); return s; }
+    if (!p) { hoe::Log("config: could not build ini path, using built-in defaults"); return s; }
 
     if (GetFileAttributesA(p) == INVALID_FILE_ATTRIBUTES) {
         WriteDefaults(p);
@@ -180,7 +192,58 @@ Settings Load() {
     s.ForceFadeIn      = GetPrivateProfileIntA("Results", "ForceFadeIn",      s.ForceFadeIn,      p);
     s.UnlockAllModes   = GetPrivateProfileIntA("Modes",   "UnlockAllModes",   s.UnlockAllModes,   p);
     s.DiagMissionWatch = GetPrivateProfileIntA("Modes",   "DiagMissionWatch", s.DiagMissionWatch, p);
+    s.DiagStartup      = GetPrivateProfileIntA("Modes",   "DiagStartup",      s.DiagStartup,      p);
     s.RecapFreeze      = GetPrivateProfileIntA("Modes",   "RecapFreeze",      s.RecapFreeze,      p);
+    s.DismissWatchdog  = GetPrivateProfileIntA("Modes",   "DismissWatchdog",  s.DismissWatchdog,  p);
+    s.ResetExtrasFlags = GetPrivateProfileIntA("Modes",   "ResetExtrasFlags", s.ResetExtrasFlags, p);
+    s.DiagFlagsOnly    = GetPrivateProfileIntA("Modes",   "DiagFlagsOnly",    s.DiagFlagsOnly,    p);
+    s.DiagMissionTrace = GetPrivateProfileIntA("Modes",   "DiagMissionTrace", s.DiagMissionTrace, p);
+    s.PanelDirectDraw  = GetPrivateProfileIntA("Modes",   "PanelDirectDraw",  s.PanelDirectDraw,  p);
+    s.PanelSortBias    = GetPrivateProfileIntA("Modes",   "PanelSortBias",    s.PanelSortBias,    p);
+    s.PanelTextPrio    = GetPrivateProfileIntA("Modes",   "PanelTextPrio",    s.PanelTextPrio,    p);
+    s.PanelNumbers     = GetPrivateProfileIntA("Modes",   "PanelNumbers",     s.PanelNumbers,     p);
+    s.PanelPulseLatest = GetPrivateProfileIntA("Modes",   "PanelPulseLatest", s.PanelPulseLatest, p);
+    s.PanelRollFrames  = GetPrivateProfileIntA("Modes",   "PanelRollFrames",  s.PanelRollFrames,  p);
+    s.PanelRecordBanner= GetPrivateProfileIntA("Modes",   "PanelRecordBanner",s.PanelRecordBanner,p);
+    s.PanelBannerFrames= GetPrivateProfileIntA("Modes",   "PanelBannerFrames",s.PanelBannerFrames,p);
+    s.PanelNumberWidth = GetPrivateProfileIntA("Modes",   "PanelNumberWidth", s.PanelNumberWidth, p);
+    s.PanelNumberFont  = GetPrivateProfileIntA("Modes",   "PanelNumberFont",  s.PanelNumberFont,  p);
+    s.PanelSounds      = GetPrivateProfileIntA("Modes",   "PanelSounds",      s.PanelSounds,      p);
+    s.PanelSeRoll      = GetPrivateProfileIntA("Modes",   "PanelSeRoll",      s.PanelSeRoll,      p);
+    s.PanelSeSettle    = GetPrivateProfileIntA("Modes",   "PanelSeSettle",    s.PanelSeSettle,    p);
+    s.PanelSeNewRecord = GetPrivateProfileIntA("Modes",   "PanelSeNewRecord", s.PanelSeNewRecord, p);
+    s.PanelSeDecide    = GetPrivateProfileIntA("Modes",   "PanelSeDecide",    s.PanelSeDecide,    p);
+    s.PanelRankingFont = GetPrivateProfileIntA("Modes",   "PanelRankingFont", s.PanelRankingFont, p);
+    s.ChaseRankPanel   = GetPrivateProfileIntA("Modes",   "ChaseRankPanel",   s.ChaseRankPanel,   p);
+    s.ChaseWinCode     = GetPrivateProfileIntA("Modes",   "ChaseWinCode",     s.ChaseWinCode,     p);
+    s.EndlessTagPanel  = GetPrivateProfileIntA("Modes",   "EndlessTagPanel",  s.EndlessTagPanel,  p);
+    s.DiagForceEndlessRecord =
+        GetPrivateProfileIntA("Modes", "DiagForceEndlessRecord", s.DiagForceEndlessRecord, p);
+    s.EndlessSuppressResult =
+        GetPrivateProfileIntA("Modes", "EndlessSuppressResult", s.EndlessSuppressResult, p);
+    s.FixEndlessHandoff= GetPrivateProfileIntA("Modes",   "FixEndlessHandoff",s.FixEndlessHandoff,p);
+    s.FixChaseDrainRate= GetPrivateProfileIntA("Modes",   "FixChaseDrainRate",s.FixChaseDrainRate,p);
+    s.ChaseReplayIntro = GetPrivateProfileIntA("Modes", "ChaseReplayIntro", s.ChaseReplayIntro, p);
+    s.EscapeReplayIntro = GetPrivateProfileIntA("Modes", "EscapeReplayIntro", s.EscapeReplayIntro, p);
+    s.DiagEscapeTrace  = GetPrivateProfileIntA("Modes", "DiagEscapeTrace",  s.DiagEscapeTrace,  p);
+    s.DiagCaptionTrace = GetPrivateProfileIntA("Modes", "DiagCaptionTrace", s.DiagCaptionTrace, p);
+    s.DiagTalkMatch    = GetPrivateProfileIntA("Modes", "DiagTalkMatch",    s.DiagTalkMatch,    p);
+    s.PostModeBobFlags = GetPrivateProfileIntA("Modes", "PostModeBobFlags", s.PostModeBobFlags, p);
+    s.AmebaFloor       = GetPrivateProfileIntA("Modes", "AmebaFloor",       s.AmebaFloor,       p);
+    s.ChaseResetCaptionSeen = GetPrivateProfileIntA("Modes", "ChaseResetCaptionSeen", s.ChaseResetCaptionSeen, p);
+    s.DiagDrainClock   = GetPrivateProfileIntA("Modes",   "DiagDrainClock",   s.DiagDrainClock,   p);
+    s.ChaseDrainFramesPer10 =
+        GetPrivateProfileIntA("Modes", "ChaseDrainFramesPer10", s.ChaseDrainFramesPer10, p);
+    s.FixSteamAchievementCrash =
+        GetPrivateProfileIntA("Modes", "FixSteamAchievementCrash", s.FixSteamAchievementCrash, p);
+    s.FixTagHelpPanel  = GetPrivateProfileIntA("Modes",   "FixTagHelpPanel",  s.FixTagHelpPanel,  p);
+    s.PanelNumberCellW = GetPrivateProfileIntA("Modes",   "PanelNumberCellW", s.PanelNumberCellW, p);
+    s.PanelNumberMetric= GetPrivateProfileIntA("Modes",   "PanelNumberMetric",s.PanelNumberMetric,p);
+    s.PanelPulseDelayMs= GetPrivateProfileIntA("Modes",   "PanelPulseDelayMs",s.PanelPulseDelayMs,p);
+    s.PanelPulseHoldMs = GetPrivateProfileIntA("Modes",   "PanelPulseHoldMs", s.PanelPulseHoldMs, p);
+    s.DiagTextBind     = GetPrivateProfileIntA("Modes",   "DiagTextBind",     s.DiagTextBind,     p);
+    s.PanelHideTimeLabel = GetPrivateProfileIntA("Modes", "PanelHideTimeLabel", s.PanelHideTimeLabel, p);
+    s.PanelClosePrompt   = GetPrivateProfileIntA("Modes", "PanelClosePrompt",   s.PanelClosePrompt,   p);
     s.NetRankingPanel  = GetPrivateProfileIntA("Results", "NetRankingPanel",  s.NetRankingPanel,  p);
 
     // An unvalidated id indexes the screen-slot array (mainMgr + 0x1E8 + id*8).

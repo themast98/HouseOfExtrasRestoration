@@ -15,7 +15,7 @@ import pathlib
 import sys
 import time
 
-GAME = pathlib.Path(r"D:\SteamLibrary\steamapps\common\Yakuza 4")
+GAME = pathlib.Path(r"D:\SteamLibrary\steamapps\common\Yakuza 4") / "mods" / "House of Extras Restoration"  # runtime files live next to the .asi
 CMD = GAME / "HouseOfExtras.cmd"
 REPLY = GAME / "HouseOfExtras.reply"
 

@@ -6,12 +6,12 @@
 
 namespace hoe {
 
-const char* ExeRelative(const char* leaf) {
-    // One cache slot per distinct leaf pointer. There are only three callers
-    // (ini, records, log), each passing a string literal, so a tiny table beats
-    // dragging in std::map for this.
+const char* ModRelative(const char* leaf) {
+    // One cache slot per distinct leaf pointer. There are only a handful of
+    // callers (ini, records, log, console), each passing a string literal, so
+    // a tiny table beats dragging in std::map for this.
     struct Entry { const char* leaf; char path[MAX_PATH]; bool ok; };
-    static Entry cache[4] = {};
+    static Entry cache[6] = {};
     static int used = 0;
 
     for (int i = 0; i < used; ++i) {
@@ -23,7 +23,19 @@ const char* ExeRelative(const char* leaf) {
     e.leaf = leaf;
     e.ok = false;
 
-    const DWORD n = GetModuleFileNameA(nullptr, e.path, MAX_PATH);
+    // The module that contains THIS function, i.e. HouseOfExtras.asi itself -
+    // not the exe (GetModuleFileName(nullptr)), which would put every file in
+    // the game root. The mod ships as one folder under mods/, and its ini, log
+    // and records have to live in that same folder so that removing the folder
+    // removes everything.
+    HMODULE self = nullptr;
+    if (!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                            GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                            (LPCSTR)&ModRelative, &self)) {
+        return nullptr;
+    }
+
+    const DWORD n = GetModuleFileNameA(self, e.path, MAX_PATH);
     // n == 0 is failure; n == MAX_PATH means it was truncated, and a truncated
     // path would put our file in the wrong place, so refuse both.
     if (n == 0 || n >= MAX_PATH) return nullptr;

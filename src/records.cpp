@@ -20,12 +20,19 @@ bool  gLoaded = false;
 // is rejected on BOTH load and store and the file heals itself on next write.
 constexpr int kMaxPlausibleScore = 9999;
 
-bool Plausible(int score) { return score > 0 && score <= kMaxPlausibleScore; }
+// A time board stores the PS3 composite value, whose largest legal reading is
+// 99:59'59"99. Kills and times therefore need DIFFERENT bounds, and sharing one
+// range would either reject real times or admit absurd scores.
+constexpr int kMaxPlausibleTime = 359999999;
+
+bool Plausible(int v, bool timeMode) {
+    return v > 0 && v <= (timeMode ? kMaxPlausibleTime : kMaxPlausibleScore);
+}
 
 // Was a hand-rolled GetModuleFileName + unbounded strcpy, which overruns the
 // buffer when the install directory is deep enough that the leaf name no
 // longer fits. config.cpp guarded the same operation; this copy did not.
-const char* Path() { return hoe::ExeRelative("HouseOfExtras.records"); }
+const char* Path() { return hoe::ModRelative("HouseOfExtras.records"); }
 
 void Load() {
     if (gLoaded) return;
@@ -39,7 +46,7 @@ void Load() {
         if (line[0] == '#' || line[0] == '\n') continue;
         int k = 0, v = 0;
         if (sscanf(line, "%d=%d", &k, &v) != 2) continue;
-        if (!Plausible(v)) {
+        if (!Plausible(v, true)) {
             hoe::Log("records: discarding implausible stored best %d=%d", k, v);
             continue;   // dropped here, and gone from the file on the next Save()
         }
@@ -63,16 +70,24 @@ void Save() {
 int GetBest(int modeId) {
     Load();
     for (int i = 0; i < gCount; ++i) if (g[i].mode == modeId) return g[i].score;
-    return 0;
+    return 0;   // 0 always means "no record yet", for BOTH kinds
 }
 
-bool SetBest(int modeId, int score) {
+// timeMode inverts the comparison: on a race, the BEST time is the SMALLEST.
+// Getting this wrong would mean the first run stands forever, because every
+// later time would fail a `>` test - a silent failure that looks like the
+// records file not saving.
+bool SetBest(int modeId, int score, bool timeMode) {
     Load();
-    if (!Plausible(score)) {
-        hoe::Log("records: refusing to store implausible score %d for mode %d", score, modeId);
+    if (!Plausible(score, timeMode)) {
+        hoe::Log("records: refusing to store implausible %s %d for mode %d",
+                 timeMode ? "time" : "score", score, modeId);
         return false;
     }
-    if (score <= GetBest(modeId)) return false;
+    const int cur = GetBest(modeId);
+    const bool better = timeMode ? (cur == 0 || score < cur)   // 0 = no record
+                                 : (score > cur);
+    if (!better) return false;
     for (int i = 0; i < gCount; ++i) {
         if (g[i].mode == modeId) { g[i].score = score; Save(); return true; }
     }

@@ -2,7 +2,7 @@
 
 namespace console {
 
-// Polls HouseOfExtras.cmd (next to the exe) and writes HouseOfExtras.reply.
+// Polls HouseOfExtras.cmd (next to the .asi in the mod folder) and writes HouseOfExtras.reply.
 //
 // MUST be called from the game thread. Engine calls that touch the layout and
 // resource systems are not thread-safe, and the whole point of this channel is

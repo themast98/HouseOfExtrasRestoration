@@ -1,10 +1,25 @@
+# build output and release packages
 build/
+dist/*.zip
+dist/stage/
+archive/
+
+# reference data derived from the game - never commit game code or assets
 refs/*.bin
+refs/*.sllz
+refs/*.par
+refs/*.dds
+
+# runtime files the plugin writes (they live in the mod folder, but keep them
+# out of the tree if a build is ever run from here)
 *.asi
 *.log
 *.records
-__pycache__/
-*.pyc
-refs/*.sllz
 *.cmd
 *.reply
+*.ini
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
